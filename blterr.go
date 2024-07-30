@@ -1,4 +1,4 @@
-package main
+package blink_tree
 
 type BLTErr int
 

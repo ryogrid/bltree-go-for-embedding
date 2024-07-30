@@ -1,4 +1,4 @@
-package main
+package blink_tree
 
 import (
 	"bytes"
@@ -193,7 +193,7 @@ func TestPage_SetValue(t *testing.T) {
 func TestPutID(t *testing.T) {
 	type args struct {
 		dest [BtId]uint8
-		id   uid
+		id   Uid
 	}
 	tests := []struct {
 		name string
@@ -226,7 +226,7 @@ func TestGetID(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want uid
+		want Uid
 	}{
 		{
 			name: "get id",
@@ -319,7 +319,7 @@ func TestPage_FindSlot(t *testing.T) {
 func TestCopyPage(t *testing.T) {
 	set1 := PageSet{
 		page:  NewPage(10),
-		latch: &LatchSet{},
+		latch: &Latchs{},
 	}
 
 	set2 := PageSet{

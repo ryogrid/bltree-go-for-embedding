@@ -1,11 +1,11 @@
-package main
+package blink_tree
 
 import (
 	"fmt"
 	"os"
 )
 
-type uid uint64
+type Uid uint64
 
 const (
 	_FileOffsetBits = 64
@@ -25,7 +25,7 @@ const (
 	ClockBit = uint32(0x8000) // the bit in pool->pin
 
 	AllocPage = 0      // allocation & lock manager hash table
-	RootPage  = uid(1) // root of the btree
+	RootPage  = Uid(1) // root of the btree
 	LeafPage  = 2      // first page of leaves
 	LatchPage = 3      // pages for lock manager
 
