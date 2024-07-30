@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/ryogrid/sametree/lib/types"
+	"github.com/ryogrid/blink-tree-go/types"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ryogrid/sametree/lib/storage/buffer"
-	"github.com/ryogrid/sametree/lib/storage/disk"
+	"github.com/ryogrid/blink-tree-go/storage/buffer"
+	"github.com/ryogrid/blink-tree-go/storage/disk"
 )
 
 func TestBLTree_collapseRoot(t *testing.T) {

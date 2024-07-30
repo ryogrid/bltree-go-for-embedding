@@ -7,9 +7,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ryogrid/sametree/lib/storage/buffer"
-	shpage "github.com/ryogrid/sametree/lib/storage/page"
-	"github.com/ryogrid/sametree/lib/types"
+	"github.com/ryogrid/blink-tree-go/storage/buffer"
+	shpage "github.com/ryogrid/blink-tree-go/storage/page"
+	"github.com/ryogrid/blink-tree-go/types"
 )
 
 const HASH_TABLE_ENTRY_CHAIN_LEN = 16
