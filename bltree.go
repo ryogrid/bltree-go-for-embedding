@@ -24,8 +24,8 @@ func (itr *BLTreeItr) Next() (ok bool, key []byte, value []byte) {
 }
 
 type BLTree struct {
-	mgr    BufMgr // buffer manager for thread
-	cursor *Page  // cached frame for start/next (never mapped)
+	mgr    *BufMgr // buffer manager for thread
+	cursor *Page   // cached frame for start/next (never mapped)
 	// note: not use singleton frame to avoid race condition
 	// frame      *Page          // spare frame for the page split (never mapped)
 	cursorPage Uid // current cursor page number
@@ -83,7 +83,7 @@ type BLTree struct {
  */
 
 // NewBLTree open BTree access method based on buffer manager
-func NewBLTree(bufMgr BufMgr) *BLTree {
+func NewBLTree(bufMgr *BufMgr) *BLTree {
 	tree := BLTree{
 		mgr: bufMgr,
 	}
