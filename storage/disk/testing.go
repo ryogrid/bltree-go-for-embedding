@@ -4,7 +4,7 @@
 package disk
 
 import (
-	"github.com/ryogrid/blink-tree-go/common"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
 	"io/ioutil"
 	"os"
 )

@@ -6,10 +6,10 @@ package buffer
 import (
 	"fmt"
 	"github.com/ncw/directio"
-	"github.com/ryogrid/blink-tree-go/common"
-	"github.com/ryogrid/blink-tree-go/storage/disk"
-	"github.com/ryogrid/blink-tree-go/storage/page"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
+	"github.com/ryogrid/bltree-go-for-embedding/storage/disk"
+	"github.com/ryogrid/bltree-go-for-embedding/storage/page"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 	"sort"
 	"sync"
 )

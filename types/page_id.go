@@ -6,7 +6,7 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/ryogrid/blink-tree-go/errors"
+	"github.com/ryogrid/bltree-go-for-embedding/errors"
 )
 
 // PageID is the type of the page identifier

@@ -1,4 +1,4 @@
-module github.com/ryogrid/blink-tree-go
+module github.com/ryogrid/bltree-go-for-embedding
 
 go 1.21
 

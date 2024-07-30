@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/dsnet/golib/memfile"
-	"github.com/ryogrid/blink-tree-go/common"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 // DiskManagerImpl is the disk implementation of DiskManager

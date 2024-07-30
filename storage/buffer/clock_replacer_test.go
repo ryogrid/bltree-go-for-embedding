@@ -4,7 +4,7 @@
 package buffer
 
 import (
-	testingpkg "github.com/ryogrid/blink-tree-go/testing/testing_assert"
+	testingpkg "github.com/ryogrid/bltree-go-for-embedding/testing/testing_assert"
 	"testing"
 )
 

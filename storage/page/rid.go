@@ -5,7 +5,7 @@ package page
 
 import (
 	"fmt"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 // RID is the record identifier for the given page identifier and slot number

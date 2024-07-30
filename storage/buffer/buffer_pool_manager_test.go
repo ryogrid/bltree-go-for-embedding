@@ -5,12 +5,12 @@ package buffer
 
 import (
 	"crypto/rand"
-	testingpkg "github.com/ryogrid/blink-tree-go/testing/testing_assert"
+	testingpkg "github.com/ryogrid/bltree-go-for-embedding/testing/testing_assert"
 	"testing"
 
-	"github.com/ryogrid/blink-tree-go/common"
-	"github.com/ryogrid/blink-tree-go/storage/disk"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
+	"github.com/ryogrid/bltree-go-for-embedding/storage/disk"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 func TestBinaryData(t *testing.T) {

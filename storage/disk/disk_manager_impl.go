@@ -12,8 +12,8 @@ import (
 	"sync"
 
 	"github.com/ncw/directio"
-	"github.com/ryogrid/blink-tree-go/common"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 // DiskManagerImpl is the disk implementation of DiskManager

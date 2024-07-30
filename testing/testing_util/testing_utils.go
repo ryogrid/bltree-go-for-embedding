@@ -4,7 +4,7 @@
 package testing_util
 
 import (
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 func GetValue(data interface{}) (value types.Value) {

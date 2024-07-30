@@ -5,8 +5,8 @@ package page
 
 import (
 	//"github.com/sasha-s/go-deadlock"
-	"github.com/ryogrid/blink-tree-go/common"
-	"github.com/ryogrid/blink-tree-go/types"
+	"github.com/ryogrid/bltree-go-for-embedding/common"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 	"sync"
 	"sync/atomic"
 )
