@@ -75,6 +75,10 @@ func (p *Page) Data() *[common.PageSize]byte {
 	return p.data
 }
 
+func (p *Page) DataAsSlice() []byte {
+	return p.data[:]
+}
+
 // SetIsDirty sets the isDirty bit
 func (p *Page) SetIsDirty(isDirty bool) {
 	p.isDirty = isDirty
