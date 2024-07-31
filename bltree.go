@@ -87,7 +87,7 @@ func NewBLTree(bufMgr *BufMgr) *BLTree {
 	tree := BLTree{
 		mgr: bufMgr,
 	}
-	tree.cursor = NewPage(bufMgr.GetPageDataSize())
+	tree.cursor = NewPage(bufMgr.pageDataSize)
 
 	return &tree
 }
@@ -415,7 +415,7 @@ func (tree *BLTree) findKey(key []byte, valMax int) (ret int, foundKey []byte, f
 //	0 - page needs splitting
 //	>0 new slot value
 func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen uint8) uint32 {
-	nxt := tree.mgr.GetPageDataSize()
+	nxt := tree.mgr.pageDataSize
 	page := set.page
 	max := page.Cnt
 
@@ -425,17 +425,17 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 
 	// skip cleanup and proceed to split
 	// if there's not enough garbage to bother with.
-	afterCleanSize := (tree.mgr.GetPageDataSize() - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
+	afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
 
-	if int(tree.mgr.GetPageDataSize())-int(afterCleanSize) < int(tree.mgr.GetPageDataSize()/5) {
+	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
 		return 0
 	}
 
-	frame := NewPage(tree.mgr.GetPageDataSize())
+	frame := NewPage(tree.mgr.pageDataSize)
 	MemCpyPage(frame, page)
 
 	// skip page info and set rest of page to zero
-	page.Data = make([]byte, tree.mgr.GetPageDataSize())
+	page.Data = make([]byte, tree.mgr.pageDataSize)
 	set.latch.dirty = true
 	page.Garbage = 0
 	page.Act = 0
@@ -507,7 +507,7 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 // split the root and raise the height of the btree
 func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 	var left PageSet
-	nxt := tree.mgr.GetPageDataSize()
+	nxt := tree.mgr.pageDataSize
 	var value [BtId]byte
 	// save left page fence key for new root
 	leftKey := root.page.Key(root.page.Cnt)
@@ -523,7 +523,7 @@ func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 
 	// preserve the page info at the bottom
 	// of higher keys and set rest to zero
-	root.page.Data = make([]byte, tree.mgr.GetPageDataSize())
+	root.page.Data = make([]byte, tree.mgr.pageDataSize)
 
 	// insert stopper key at top of newroot page
 	// and increase the root height
@@ -562,12 +562,12 @@ func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 // split already locked full node; leave it locked.
 // @return pool entry for new right page, unlocked
 func (tree *BLTree) splitPage(set *PageSet) uint {
-	nxt := tree.mgr.GetPageDataSize()
+	nxt := tree.mgr.pageDataSize
 	lvl := set.page.Lvl
 	var right PageSet
 
 	// split higher half of keys to frame
-	frame := NewPage(tree.mgr.GetPageDataSize())
+	frame := NewPage(tree.mgr.pageDataSize)
 	max := set.page.Cnt
 	cnt := max / 2
 	idx := uint32(0)
@@ -607,7 +607,7 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		}
 	}
 
-	frame.Bits = tree.mgr.GetPageBits()
+	frame.Bits = tree.mgr.pageBits
 	frame.Min = nxt
 	frame.Cnt = idx
 	frame.Lvl = lvl
@@ -623,10 +623,10 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	}
 
 	MemCpyPage(frame, set.page)
-	set.page.Data = make([]byte, tree.mgr.GetPageDataSize())
+	set.page.Data = make([]byte, tree.mgr.pageDataSize)
 	set.latch.dirty = true
 
-	nxt = tree.mgr.GetPageDataSize()
+	nxt = tree.mgr.pageDataSize
 	set.page.Garbage = 0
 	set.page.Act = 0
 	max /= 2
@@ -795,7 +795,7 @@ func (tree *BLTree) insertSlot(
 
 // newDup
 func (tree *BLTree) newDup() Uid {
-	return Uid(atomic.AddUint64(&tree.mgr.GetPageZero().dups, 1))
+	return Uid(atomic.AddUint64(&(&tree.mgr.pageZero).dups, 1))
 }
 
 // Note: currently, uniq argument is always true
@@ -855,7 +855,7 @@ func (tree *BLTree) insertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 				entry := tree.splitPage(&set)
 				if entry == 0 {
 					return tree.err
-				} else if err := tree.splitKeys(&set, &tree.mgr.GetLatchSets()[entry]); err != BLTErrOk {
+				} else if err := tree.splitKeys(&set, &tree.mgr.latchs[entry]); err != BLTErrOk {
 					return err
 				} else {
 					continue

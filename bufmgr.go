@@ -85,10 +85,8 @@ func NewBufMgr(name string, bits uint8, nodeMax uint, bpm *buffer.BufferPoolMana
 		}
 
 		page.Data = shPageZero.Data()[PageHeaderSize:]
-		//pageZeroBytes = pageBytes
 		mgr.pageZero.alloc = shPageZero.Data()[:]
 		mgr.loadPageIdMapping(shPageZero)
-		//mgr.loadPageIdMapping(shPageZero, false)
 
 		if err2 := binary.Read(bytes.NewReader(mgr.pageZero.alloc), binary.LittleEndian, &page.PageHeader); err2 != nil {
 			panic(fmt.Sprintf("Unable to read btree file: %v\n", err2))
@@ -123,7 +121,6 @@ func NewBufMgr(name string, bits uint8, nodeMax uint, bpm *buffer.BufferPoolMana
 		if err2 := binary.Write(buf, binary.LittleEndian, alloc.PageHeader); err2 != nil {
 			panic(fmt.Sprintf("Unable to output page header as bytes: %v\n", err2))
 		}
-		//mgr.pageZero.alloc = buf.Bytes()
 		allocBytes = buf.Bytes()
 		allocBytes = append(allocBytes, make([]byte, mgr.pageSize-PageHeaderSize)...)
 		mgr.pageZero.alloc = allocBytes
@@ -238,9 +235,6 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		headerBytes := headerBuf.Bytes()
 		copy(shPage.Data()[:PageHeaderSize], headerBytes)
 		copy(shPage.Data()[PageHeaderSize:], page.Data)
-		//fmt.Println("PageOut: write page. dirty!")
-	} else {
-		//fmt.Println("PageOut: write page. not dirty!")
 	}
 	mgr.bpm.UnpinPage(shPageId, isDirty)
 
@@ -367,7 +361,6 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 		mappingCnt++
 		if mappingCnt >= maxSerializeNum {
 			// reached capacity limit
-			// TODO: (sametree) need to reuse page if already allocated
 			shPage := mgr.bpm.NewPage()
 			if shPage == nil {
 				panic("failed to create new page")
@@ -403,7 +396,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	// write mapping data header
 	buf := make([]byte, ShPageIdSize)
 	// -1 as int32
-	// this is marker for end of mapping data
+	// this is a marker for the end of mapping data
 	binary.LittleEndian.PutUint32(buf, uint32(0xffffffff))
 	copy(curPage.Data[:NextShPageIdForIdMappingSize], buf)
 	binary.LittleEndian.PutUint32(buf, mappingCnt)
@@ -412,7 +405,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	// write back to SamehadaDB's buffer pool
 	if !isPageZero {
 		// free samehada page
-		// (calling PageOut is not needed due to page header is not used in this case)
+		// (calling PageOut is unnecessary due to the page header is not used in this case)
 		mgr.bpm.UnpinPage(pageId, true)
 	}
 }
@@ -551,7 +544,6 @@ func (mgr *BufMgr) PinLatch(pageNo Uid, loadIt bool, reads *uint, writes *uint) 
 	}
 
 	// see if there are any unused pool entries
-
 	slot = uint(atomic.AddUint32(&mgr.latchDeployed, 1))
 	if slot < mgr.latchTotal {
 		latch := &mgr.latchs[slot]
@@ -594,7 +586,7 @@ func (mgr *BufMgr) PinLatch(pageNo Uid, loadIt bool, reads *uint, writes *uint) 
 			continue
 		}
 
-		//  update permanent page area in btree from buffer pool
+		//  update the permanent page area in btree from the buffer pool
 		page := mgr.pagePool[slot]
 
 		//if latch.dirty {
@@ -675,10 +667,9 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 	// unlock allocation latch
 	mgr.lock.SpinReleaseWrite()
 
-	// don't load cache from btree page
+	// don't load cache from the btree page
 	set.latch = mgr.PinLatch(pageNo, false, reads, writes)
 	if set.latch != nil {
-		//fmt.Println("NewPage: at mgr.GetRefOfPageAtPool. pageNo: ", pageNo, " latch.pageNo: ", set.latch.pageNo, " latch.entry: ", set.latch.entry)
 		set.page = mgr.GetRefOfPageAtPool(set.latch)
 	} else {
 		mgr.err = BLTErrStruct
@@ -693,7 +684,8 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 	return mgr.err
 }
 
-// LoadPage find and load page at given level for given key leave page read or write locked as requested
+// PageFetch find and fetch page at given level for given key
+// leave page read or write locked as requested
 func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMode, reads *uint, writes *uint) uint32 {
 	pageNo := RootPage
 	prevPage := Uid(0)
@@ -704,7 +696,7 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 	mode := LockNone
 	prevMode := LockNone
 
-	// start at root of btree and drill down
+	// start at the root of btree and drill down
 	for pageNo > 0 {
 		// determine lock mode of drill level
 		if drill == lvl {
@@ -780,7 +772,7 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 		prevMode = mode
 
 		//  find key on page at this level
-		//  and descend to requested level
+		//  and descend to the requested level
 		if set.page.Kill {
 			goto sliderRight
 		}
@@ -801,7 +793,6 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 			}
 
 			pageNo = GetIDFromValue(set.page.Value(slot))
-			//fmt.Println("PageFetch: move from ", set.latch.pageNo, "(", set.page.Lvl, ") to ", pageNo, "(", drill-1, ")")
 			drill--
 			continue
 		}
@@ -830,7 +821,7 @@ func (mgr *BufMgr) PageFree(set *PageSet) {
 	set.latch.dirty = true
 	set.page.Free = true
 
-	// unlock released page
+	// unlock the released page
 	mgr.PageUnlock(LockDelete, set.latch)
 	mgr.PageUnlock(LockWrite, set.latch)
 	mgr.UnpinLatch(set.latch)
@@ -870,24 +861,9 @@ func (mgr *BufMgr) PageUnlock(mode BLTLockMode, latch *Latchs) {
 		latch.access.WriteRelease()
 	case LockParent:
 		latch.parent.WriteRelease()
-		//case LockAtomic: // Note: not supported in this golang implementation
+		//case LockAtomic:
+		//Note: not supported in this golang implementation
 	}
-}
-
-func (mgr *BufMgr) GetPageDataSize() uint32 {
-	return mgr.pageDataSize
-}
-func (mgr *BufMgr) GetLatchSets() []Latchs {
-	return mgr.latchs
-}
-func (mgr *BufMgr) GetPageBits() uint8 {
-	return mgr.pageBits
-}
-func (mgr *BufMgr) GetPageZero() *PageZero {
-	return &mgr.pageZero
-}
-func (mgr *BufMgr) GetPagePool() []Page {
-	return mgr.pagePool
 }
 
 func (mgr *BufMgr) GetMappedShPageIdOfPageZero() types.PageID {

@@ -211,7 +211,7 @@ func TestBufMgr_PinLatch(t *testing.T) {
 			}
 			if tt.args.pageNo > 2 {
 				// if pageNo is over 2, we need to write the page to disk
-				p := NewPage(mgr.GetPageDataSize())
+				p := NewPage(mgr.pageDataSize)
 				mgr.PageOut(p, tt.args.pageNo, true)
 			}
 			latch := mgr.PinLatch(tt.args.pageNo, tt.args.loadIt, &tt.args.reads, &tt.args.writes)
@@ -421,7 +421,7 @@ func TestBufMgr_NewPage(t *testing.T) {
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
-			initialAllocRight := GetID(mgr.GetPageZero().AllocRight())
+			initialAllocRight := GetID((&mgr.pageZero).AllocRight())
 			if initialAllocRight != MinLvl+1 {
 				t.Errorf("NewBufMgr() failed to initialize allock right")
 			}
@@ -429,11 +429,11 @@ func TestBufMgr_NewPage(t *testing.T) {
 				t.Errorf("NewPage() failed to create page with unexpected err: %v", err)
 			}
 
-			if got := GetID(mgr.GetPageZero().AllocRight()); got != initialAllocRight+1 {
+			if got := GetID((&mgr.pageZero).AllocRight()); got != initialAllocRight+1 {
 				t.Errorf("NewPage() failed to increment alloc right = %d, want %d", got, initialAllocRight+1)
 			}
 
-			wantData := make([]byte, mgr.GetPageDataSize())
+			wantData := make([]byte, mgr.pageDataSize)
 			for i := range tt.args.page.Data {
 				wantData[i] = tt.args.page.Data[i]
 			}

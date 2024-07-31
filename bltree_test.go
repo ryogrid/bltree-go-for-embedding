@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/ryogrid/sametree/lib/types"
+	"github.com/ryogrid/bltree-go-for-embedding/types"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ryogrid/sametree/lib/storage/buffer"
-	"github.com/ryogrid/sametree/lib/storage/disk"
+	"github.com/ryogrid/bltree-go-for-embedding/storage/buffer"
+	"github.com/ryogrid/bltree-go-for-embedding/storage/disk"
 )
 
 func TestBLTree_collapseRoot(t *testing.T) {
@@ -46,10 +46,10 @@ func TestBLTree_collapseRoot(t *testing.T) {
 				}
 
 			}
-			if rootAct := tree.mgr.GetPagePool()[RootPage].Act; rootAct != 1 {
+			if rootAct := tree.mgr.pagePool[RootPage].Act; rootAct != 1 {
 				t.Errorf("rootAct = %v, want %v", rootAct, 1)
 			}
-			if childAct := tree.mgr.GetPagePool()[RootPage+1].Act; childAct != 3 {
+			if childAct := tree.mgr.pagePool[RootPage+1].Act; childAct != 3 {
 				t.Errorf("childAct = %v, want %v", childAct, 3)
 			}
 			var set PageSet
@@ -59,11 +59,11 @@ func TestBLTree_collapseRoot(t *testing.T) {
 				t.Errorf("collapseRoot() = %v, want %v", got, tt.want)
 			}
 
-			if rootAct := tree.mgr.GetPagePool()[RootPage].Act; rootAct != 3 {
+			if rootAct := tree.mgr.pagePool[RootPage].Act; rootAct != 3 {
 				t.Errorf("after collapseRoot rootAct = %v, want %v", rootAct, 3)
 			}
 
-			if !tree.mgr.GetPagePool()[RootPage+1].Free {
+			if !tree.mgr.pagePool[RootPage+1].Free {
 				t.Errorf("after collapseRoot childFree = %v, want %v", false, true)
 			}
 
@@ -95,7 +95,7 @@ func TestBLTree_cleanPage_full_page(t *testing.T) {
 	fmt.Printf("size: %v\n", len(data))
 
 	set := PageSet{
-		page:  NewPage(mgr.GetPageDataSize()),
+		page:  NewPage(mgr.pageDataSize),
 		latch: &Latchs{},
 	}
 	copy(set.page.Data, data)
