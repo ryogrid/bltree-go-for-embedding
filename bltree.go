@@ -113,12 +113,12 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 
 	// insert new (now smaller) fence key
 
-	if err := tree.insertKey(leftKey, lvl+1, value, true); err != BLTErrOk {
+	if err := tree.InsertKey(leftKey, lvl+1, value, true); err != BLTErrOk {
 		return err
 	}
 
 	// now delete old fence key
-	if err := tree.deleteKey(rightKey, lvl+1); err != BLTErrOk {
+	if err := tree.DeleteKey(rightKey, lvl+1); err != BLTErrOk {
 		return err
 	}
 
@@ -220,12 +220,12 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 	tree.mgr.PageLock(LockParent, set.latch)
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 
-	if err := tree.insertKey(higherFence, set.page.Lvl+1, value, true); err != BLTErrOk {
+	if err := tree.InsertKey(higherFence, set.page.Lvl+1, value, true); err != BLTErrOk {
 		return err
 	}
 
 	// delete old lower key to our node
-	if err := tree.deleteKey(lowerFence, set.page.Lvl+1); err != BLTErrOk {
+	if err := tree.DeleteKey(lowerFence, set.page.Lvl+1); err != BLTErrOk {
 		return err
 	}
 
@@ -240,11 +240,11 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 	return BLTErrOk
 }
 
-// deleteKey
+// DeleteKey
 //
 // find and delete key on page by marking delete flag bit
 // if page becomes empty, delete it from the btree
-func (tree *BLTree) deleteKey(key []byte, lvl uint8) BLTErr {
+func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 	var set PageSet
 
 	slot := tree.mgr.PageFetch(&set, key, lvl, LockWrite, &tree.reads, &tree.writes)
@@ -345,12 +345,12 @@ func (tree *BLTree) findNext(set *PageSet, slot uint32) uint32 {
 	return 1
 }
 
-// findKey
+// FindKey
 //
 // find unique key or first duplicate key in
 // leaf level and return number of value bytes
 // or (-1) if not found. Setup key for foundKey
-func (tree *BLTree) findKey(key []byte, valMax int) (ret int, foundKey []byte, foundValue []byte) {
+func (tree *BLTree) FindKey(key []byte, valMax int) (ret int, foundKey []byte, foundValue []byte) {
 	var set PageSet
 	ret = -1
 	slot := tree.mgr.PageFetch(&set, key, 0, LockRead, &tree.reads, &tree.writes)
@@ -701,14 +701,14 @@ func (tree *BLTree) splitKeys(set *PageSet, right *Latchs) BLTErr {
 	var value [BtId]byte
 	PutID(&value, set.latch.pageNo)
 
-	if err := tree.insertKey(leftKey, lvl+1, value, true); err != BLTErrOk {
+	if err := tree.InsertKey(leftKey, lvl+1, value, true); err != BLTErrOk {
 		return err
 	}
 
 	// switch fence for right block of larger keys to new right page
 	PutID(&value, right.pageNo)
 
-	if err := tree.insertKey(rightKey, lvl+1, value, true); err != BLTErrOk {
+	if err := tree.InsertKey(rightKey, lvl+1, value, true); err != BLTErrOk {
 		return err
 	}
 
@@ -799,8 +799,8 @@ func (tree *BLTree) newDup() Uid {
 }
 
 // Note: currently, uniq argument is always true
-// insertKey insert new key into the btree at a given level. either add a new key or update/add an existing one
-func (tree *BLTree) insertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool) BLTErr {
+// InsertKey insert new key into the btree at a given level. either add a new key or update/add an existing one
+func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool) BLTErr {
 	var slot uint32
 	var keyLen uint8
 	var set PageSet
