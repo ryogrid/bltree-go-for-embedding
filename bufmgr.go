@@ -51,7 +51,7 @@ func (z *PageZero) SetAllocRight(pageNo Uid) {
 }
 
 // NewBufMgr creates a new buffer manager
-func NewBufMgr(name string, bits uint8, nodeMax uint, pbm interfaces.ParentBufMgr, lastPageZeroId *types.PageID) *BufMgr {
+func NewBufMgr(name string, bits uint8, nodeMax uint, pbm interfaces.ParentBufMgr, lastPageZeroId *int32) *BufMgr {
 	initit := true
 
 	// determine sanity of page size
