@@ -195,7 +195,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 
 		//fmt.Println("PageOut: new page... : ", pageNo)
 
-		// create new page on SamehadaDB's buffer pool and db file
+		// create new page on parent's buffer pool and db file
 		// 1 pin count is left
 		shPage = mgr.pbm.NewPPage()
 		if shPage == nil {
@@ -275,7 +275,7 @@ func (mgr *BufMgr) Close() {
 	mgr.PageOut(pageZero, 0, true)
 }
 
-// deallocate free pages from SamehadaDB's buffer pool
+// deallocate free pages from parent's buffer pool
 // these page ID is not used in BLTree forever
 func (mgr *BufMgr) deleterFreePages() {
 	makeFreePageMap := func() *sync.Map {
@@ -322,11 +322,11 @@ func (mgr *BufMgr) deleterFreePages() {
 
 func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	// format
-	// page 0: | page header (26bytes) | next samehada page Id for page Id mapping info (4bytes) | mapping count or free blink-tree page count in page (4bytes) | entry-0 (12bytes) | entry-1 (12bytes) | ... |
-	// entry: | blink tree page id (int64 8bytes) | samehada page id (uint32 4bytes) |
-	// NOTE: pages are chained with next samehada page id and next free blink-tree page id
+	// page 0: | page header (26bytes) | next parent page Id for page Id mapping info (4bytes) | mapping count or free blink-tree page count in page (4bytes) | entry-0 (12bytes) | entry-1 (12bytes) | ... |
+	// entry: | blink tree page id (int64 8bytes) | parent page id (uint32 4bytes) |
+	// NOTE: pages are chained with next parent page id and next free blink-tree page id
 	//       but chain is separated to two chains.
-	//       page id mapping info is stored in page 0 and chain which uses next samehada page Id
+	//       page id mapping info is stored in page 0 and chain which uses next parent page Id
 	//       free blink-tree page info is not stored in page 0 but pointer for it is stored in page 0
 	//       and the chain uses next free blink-tree page ID
 	//       when next page does not exist, next xxxxx ID is set to 0xffffffff (uint32 max value and -1 as int32)
@@ -370,12 +370,12 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 			binary.LittleEndian.PutUint32(buf2, mappingCnt)
 			copy(curPage.Data[NextShPageIdForIdMappingSize:NextShPageIdForIdMappingSize+EntryCountSize], buf2)
 
-			// write back to SamehadaDB's buffer pool
+			// write back to parent's buffer pool
 			if isPageZero {
 				//mgr.PageOut(curPage, Uid(0), true)
 				isPageZero = false
 			} else {
-				// free samehada page
+				// free parent page
 				// (calling PageOut is not needed due to page header is not used in this case)
 				mgr.pbm.UnpinPPage(pageId, true)
 			}
@@ -399,9 +399,9 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	binary.LittleEndian.PutUint32(buf, mappingCnt)
 	copy(curPage.Data[NextShPageIdForIdMappingSize:NextShPageIdForIdMappingSize+EntryCountSize], buf)
 
-	// write back to SamehadaDB's buffer pool
+	// write back to parent's buffer pool
 	if !isPageZero {
-		// free samehada page
+		// free parent page
 		// (calling PageOut is unnecessary due to the page header is not used in this case)
 		mgr.pbm.UnpinPPage(int32(pageId), true)
 	}
@@ -591,7 +591,7 @@ func (mgr *BufMgr) PinLatch(pageNo Uid, loadIt bool, reads *uint, writes *uint) 
 		if err := mgr.PageOut(&page, latch.pageNo, latch.dirty); err != BLTErrOk {
 			return nil
 		} else {
-			//for relase SamehadaDB page's memory
+			//for relase parent page's memory
 			page.Data = nil
 
 			latch.dirty = false
