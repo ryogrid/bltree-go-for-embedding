@@ -15,7 +15,7 @@ func NewParentBufMgrImpl(bpm *BufferPoolManager) interfaces.ParentBufMgr {
 }
 
 func (p *ParentBufMgrImpl) FetchPPage(pageID int32) interfaces.ParentPage {
-	return &page.ParentPageImple{p.FetchPage(types.PageID(pageID))}
+	return &page.ParentPageImpl{p.FetchPage(types.PageID(pageID))}
 }
 
 func (p *ParentBufMgrImpl) UnpinPPage(pageID int32, isDirty bool) error {
@@ -23,7 +23,7 @@ func (p *ParentBufMgrImpl) UnpinPPage(pageID int32, isDirty bool) error {
 }
 
 func (p *ParentBufMgrImpl) NewPPage() interfaces.ParentPage {
-	return &page.ParentPageImple{p.NewPage()}
+	return &page.ParentPageImpl{p.NewPage()}
 }
 
 func (p *ParentBufMgrImpl) DeallocatePPage(pageID int32, isNoWait bool) error {

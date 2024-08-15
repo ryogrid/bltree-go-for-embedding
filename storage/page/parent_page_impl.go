@@ -1,21 +1,21 @@
 package page
 
-type ParentPageImple struct {
+type ParentPageImpl struct {
 	*Page
 }
 
-func (p *ParentPageImple) DecPPinCount() {
+func (p *ParentPageImpl) DecPPinCount() {
 	p.DecPinCount()
 }
 
-func (p *ParentPageImple) PinCount() int32 {
+func (p *ParentPageImpl) PPinCount() int32 {
 	return p.PinCount()
 }
 
-func (p *ParentPageImple) GetPageId() int32 {
-	return p.GetPageId()
+func (p *ParentPageImpl) GetPPageId() int32 {
+	return int32(p.GetPageId())
 }
 
-func (p *ParentPageImple) DataAsSlice() []byte {
-	return p.DataAsSlice()
+func (p *ParentPageImpl) DataAsSlice() []byte {
+	return (*p.Data())[:]
 }

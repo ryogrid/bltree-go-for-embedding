@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/ryogrid/bltree-go-for-embedding/types"
 	"math/rand"
 	"os"
 	"sync"
@@ -922,7 +921,8 @@ func TestBLTree_restart_samehada(t *testing.T) {
 
 	// use virtual disk manager which does file I/O on memory
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_restart_samehada.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	orgBpm := buffer.NewBufferPoolManager(poolSize, dm)
+	bpm := buffer.NewParentBufMgrImpl(orgBpm)
 
 	mgr := NewBufMgr("data/bltree_restart_samehada.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*2, bpm, nil)
 	bltree := NewBLTree(mgr)
@@ -955,7 +955,7 @@ func TestBLTree_restart_samehada(t *testing.T) {
 
 	// shutdown SamehadaDB which own parent buffer manager of BufMgr
 	pageZeroShId := mgr.GetMappedShPageIdOfPageZero()
-	//bpm.FlushAllPages()
+	orgBpm.FlushAllPages()
 	//dm.ShutDown()
 
 	//dm = disk.NewDiskManagerImpl("TestBLTree_restart_samehada.db")
@@ -975,7 +975,7 @@ func TestBLTree_restart_samehada(t *testing.T) {
 			//fmt.Println("pageId mapping may be removed as freed page ID: ", pageId)
 			idMappingCnt++
 			return true
-		} else if value.(types.PageID) != shPageId.(types.PageID) {
+		} else if value.(int32) != shPageId.(int32) {
 			t.Errorf("pageId mapping entry is broken.")
 			return false
 		}

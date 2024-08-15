@@ -7,8 +7,6 @@ import (
 	"github.com/ryogrid/bltree-go-for-embedding/interfaces"
 	"sync"
 	"sync/atomic"
-
-	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 const HASH_TABLE_ENTRY_CHAIN_LEN = 16
@@ -213,7 +211,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 				panic("page already exists")
 			}
 		}
-		shPageId = shPage.GetPageId()
+		shPageId = shPage.GetPPageId()
 		mgr.pageIdConvMap.Store(pageNo, shPageId)
 	}
 
@@ -223,7 +221,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 			panic("failed to fetch page")
 		}
 		// decrement pin count because the count is incremented at FetchPPage
-		if shPage.PinCount() == 2 {
+		if shPage.PPinCount() == 2 {
 			shPage.DecPPinCount()
 		}
 	}
@@ -237,7 +235,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 	}
 	mgr.pbm.UnpinPPage(shPageId, isDirty)
 
-	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "shPageId:", shPageId, "pin count: ", shPage.PinCount())
+	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "shPageId:", shPageId, "pin count: ", shPage.PPinCount())
 
 	return BLTErrOk
 }
@@ -364,7 +362,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 			if shPage == nil {
 				panic("failed to create new page")
 			}
-			nextPageId := shPage.GetPageId()
+			nextPageId := shPage.GetPPageId()
 			// write mapping data header
 			buf2 := make([]byte, ShPageIdSize)
 			binary.LittleEndian.PutUint32(buf2, uint32(nextPageId))
@@ -421,7 +419,7 @@ func (mgr *BufMgr) loadPageIdMapping(pageZero interfaces.ParentPage) {
 		for ii := 0; ii < int(mappingCnt); ii++ {
 			pageNo := Uid(binary.LittleEndian.Uint64(curShPage.DataAsSlice()[offset : offset+PageIdMappingBLETreePageSize]))
 			offset += PageIdMappingBLETreePageSize
-			shPageId := types.PageID(binary.LittleEndian.Uint32(curShPage.DataAsSlice()[offset : offset+PageIdMappingShPageSize]))
+			shPageId := int32(binary.LittleEndian.Uint32(curShPage.DataAsSlice()[offset : offset+PageIdMappingShPageSize]))
 			offset += PageIdMappingShPageSize
 			mgr.pageIdConvMap.Store(pageNo, shPageId)
 		}
@@ -431,7 +429,7 @@ func (mgr *BufMgr) loadPageIdMapping(pageZero interfaces.ParentPage) {
 		if nextShPageNo == -1 {
 			// page chain end
 			if !isPageZero {
-				mgr.pbm.UnpinPPage(curShPage.GetPageId(), false)
+				mgr.pbm.UnpinPPage(curShPage.GetPPageId(), false)
 			}
 			return
 		} else {
@@ -441,9 +439,9 @@ func (mgr *BufMgr) loadPageIdMapping(pageZero interfaces.ParentPage) {
 			}
 			if !isPageZero {
 				// unpin current page
-				mgr.pbm.UnpinPPage(curShPage.GetPageId(), false)
+				mgr.pbm.UnpinPPage(curShPage.GetPPageId(), false)
 				// deallocate current page for reuse
-				mgr.pbm.DeallocatePPage(curShPage.GetPageId(), true)
+				mgr.pbm.DeallocatePPage(curShPage.GetPPageId(), true)
 			}
 			isPageZero = false
 			curShPage = nextShPage

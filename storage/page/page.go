@@ -75,9 +75,9 @@ func (p *Page) Data() *[common.PageSize]byte {
 	return p.data
 }
 
-func (p *Page) DataAsSlice() []byte {
-	return p.data[:]
-}
+//func (p *Page) DataAsSlice() []byte {
+//	return p.data[:]
+//}
 
 // SetIsDirty sets the isDirty bit
 func (p *Page) SetIsDirty(isDirty bool) {
@@ -172,7 +172,7 @@ func (p *Page) PrintMutexDebugInfo() {
 
 func (p *Page) PrintPinCount() {
 	if common.EnableDebug {
-		common.ShPrintf(common.DEBUG_INFO, "PageId=%d PinCount=%d\n", p.id, p.PinCount())
+		common.ShPrintf(common.DEBUG_INFO, "PageId=%d PPinCount=%d\n", p.id, p.PinCount())
 	}
 }
 
