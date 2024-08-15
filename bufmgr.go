@@ -78,7 +78,7 @@ func NewBufMgr(name string, bits uint8, nodeMax uint, pbm interfaces.ParentBufMg
 	if lastPageZeroId != nil {
 		var page Page
 
-		shPageZero := mgr.pbm.FetchPage(int32(*lastPageZeroId))
+		shPageZero := mgr.pbm.FetchPPage(int32(*lastPageZeroId))
 		if shPageZero == nil {
 			panic("failed to fetch page")
 		}
@@ -162,7 +162,7 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 	//fmt.Println("PageIn pageNo: ", pageNo)
 
 	if shPageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
-		shPage := mgr.pbm.FetchPage(shPageId.(int32))
+		shPage := mgr.pbm.FetchPPage(shPageId.(int32))
 		if shPage == nil {
 			panic("failed to fetch page")
 		}
@@ -199,7 +199,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 
 		// create new page on SamehadaDB's buffer pool and db file
 		// 1 pin count is left
-		shPage = mgr.pbm.NewPage()
+		shPage = mgr.pbm.NewPPage()
 		if shPage == nil {
 			panic("failed to create new page")
 		}
@@ -218,13 +218,13 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 	}
 
 	if shPage == nil {
-		shPage = mgr.pbm.FetchPage(shPageId)
+		shPage = mgr.pbm.FetchPPage(shPageId)
 		if shPage == nil {
 			panic("failed to fetch page")
 		}
-		// decrement pin count because the count is incremented at FetchPage
+		// decrement pin count because the count is incremented at FetchPPage
 		if shPage.PinCount() == 2 {
-			shPage.DecPinCount()
+			shPage.DecPPinCount()
 		}
 	}
 
@@ -235,7 +235,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		copy(shPage.DataAsSlice()[:PageHeaderSize], headerBytes)
 		copy(shPage.DataAsSlice()[PageHeaderSize:], page.Data)
 	}
-	mgr.pbm.UnpinPage(shPageId, isDirty)
+	mgr.pbm.UnpinPPage(shPageId, isDirty)
 
 	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "shPageId:", shPageId, "pin count: ", shPage.PinCount())
 
@@ -269,7 +269,7 @@ func (mgr *BufMgr) Close() {
 
 	fmt.Println(num, "dirty pages flushed")
 
-	// Note: pbm.FetchPage and mgr.PageOut is called in these methods call
+	// Note: pbm.FetchPPage and mgr.PageOut is called in these methods call
 	mgr.serializePageIdMappingToPage(pageZero)
 
 	mgr.deleterFreePages()
@@ -313,7 +313,7 @@ func (mgr *BufMgr) deleterFreePages() {
 	freePageMap.Range(func(key, value interface{}) bool {
 		pageNo := key.(Uid)
 		if shPageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
-			mgr.pbm.DeallocatePage(shPageId.(int32), true)
+			mgr.pbm.DeallocatePPage(shPageId.(int32), true)
 			mgr.pageIdConvMap.Delete(pageNo)
 		}
 		//fmt.Println("deallocate free page: ", pageNo)
@@ -360,7 +360,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 		mappingCnt++
 		if mappingCnt >= maxSerializeNum {
 			// reached capacity limit
-			shPage := mgr.pbm.NewPage()
+			shPage := mgr.pbm.NewPPage()
 			if shPage == nil {
 				panic("failed to create new page")
 			}
@@ -379,7 +379,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 			} else {
 				// free samehada page
 				// (calling PageOut is not needed due to page header is not used in this case)
-				mgr.pbm.UnpinPage(pageId, true)
+				mgr.pbm.UnpinPPage(pageId, true)
 			}
 
 			pageId = nextPageId
@@ -405,7 +405,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	if !isPageZero {
 		// free samehada page
 		// (calling PageOut is unnecessary due to the page header is not used in this case)
-		mgr.pbm.UnpinPage(int32(pageId), true)
+		mgr.pbm.UnpinPPage(int32(pageId), true)
 	}
 }
 
@@ -431,19 +431,19 @@ func (mgr *BufMgr) loadPageIdMapping(pageZero interfaces.ParentPage) {
 		if nextShPageNo == -1 {
 			// page chain end
 			if !isPageZero {
-				mgr.pbm.UnpinPage(curShPage.GetPageId(), false)
+				mgr.pbm.UnpinPPage(curShPage.GetPageId(), false)
 			}
 			return
 		} else {
-			nextShPage := mgr.pbm.FetchPage(nextShPageNo)
+			nextShPage := mgr.pbm.FetchPPage(nextShPageNo)
 			if nextShPage == nil {
 				panic("failed to fetch page")
 			}
 			if !isPageZero {
 				// unpin current page
-				mgr.pbm.UnpinPage(curShPage.GetPageId(), false)
+				mgr.pbm.UnpinPPage(curShPage.GetPageId(), false)
 				// deallocate current page for reuse
-				mgr.pbm.DeallocatePage(curShPage.GetPageId(), true)
+				mgr.pbm.DeallocatePPage(curShPage.GetPageId(), true)
 			}
 			isPageZero = false
 			curShPage = nextShPage
@@ -637,12 +637,12 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 	// lock allocation page
 	mgr.lock.SpinWriteLock()
 
-	//fmt.Println("NewPage(1):  pageNo: ", GetID(&mgr.pageZero.chain))
+	//fmt.Println("NewPPage(1):  pageNo: ", GetID(&mgr.pageZero.chain))
 
 	// use empty chain first, else allocate empty page
 	pageNo := GetID(&mgr.pageZero.chain)
 	if pageNo > 0 {
-		//fmt.Println("NewPage(2):  pageNo: ", pageNo)
+		//fmt.Println("NewPPage(2):  pageNo: ", pageNo)
 		set.latch = mgr.PinLatch(pageNo, true, reads, writes)
 		if set.latch != nil {
 			set.page = mgr.GetRefOfPageAtPool(set.latch)

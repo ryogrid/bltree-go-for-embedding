@@ -1,8 +1,8 @@
 package interfaces
 
 type ParentBufMgr interface {
-	FetchPage(pageID int32) ParentPage
-	UnpinPage(pageID int32, isDirty bool) error
-	NewPage() ParentPage
-	DeallocatePage(pageID int32, isNoWait bool) error
+	FetchPPage(pageID int32) ParentPage
+	UnpinPPage(pageID int32, isDirty bool) error
+	NewPPage() ParentPage
+	DeallocatePPage(pageID int32, isNoWait bool) error
 }

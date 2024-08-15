@@ -57,7 +57,7 @@ func (p *Page) DecPinCount() {
 	atomic.AddInt32(&p.pinCount, -1)
 	//}
 
-	//common.ShPrintf(common.DEBUG_INFO, "pinCount of page-%d at DecPinCount: %d\n", p.GetPageId(), p.pinCount)
+	//common.ShPrintf(common.DEBUG_INFO, "pinCount of page-%d at DecPPinCount: %d\n", p.GetPageId(), p.pinCount)
 }
 
 // PinCount retunds the pin count

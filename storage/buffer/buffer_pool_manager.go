@@ -38,13 +38,13 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 		pg := b.pages[frameID]
 		if common.EnableDebug && common.ActiveLogKindSetting&common.PIN_COUNT_ASSERT > 0 {
 			common.SH_Assert(pg.PinCount() == 0 || (pg.GetPageId() == 4 || pg.GetPageId() == 5 || pg.GetPageId() == 7 || pg.GetPageId() == 8),
-				fmt.Sprintf("BPM::FetchPage pin count must be zero here when single thread execution!!!. pageId:%d PinCount:%d", pg.GetPageId(), pg.PinCount()))
+				fmt.Sprintf("BPM::FetchPPage pin count must be zero here when single thread execution!!!. pageId:%d PinCount:%d", pg.GetPageId(), pg.PinCount()))
 		}
 		pg.IncPinCount()
 		(*b.replacer).Pin(frameID)
 		b.mutex.Unlock()
 		if common.EnableDebug {
-			common.ShPrintf(common.DEBUG_INFO, "FetchPage: PageId=%d PinCount=%d\n", pg.GetPageId(), pg.PinCount())
+			common.ShPrintf(common.DEBUG_INFO, "FetchPPage: PageId=%d PinCount=%d\n", pg.GetPageId(), pg.PinCount())
 		}
 		return pg
 	}
@@ -59,15 +59,15 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 	if !isFromFreeList {
 		// remove page from current frame
 		currentPage := b.pages[*frameID]
-		//common.SH_Assert(currentPage.PinCount() >= 0, "BPM::FetchPage Victim page's pin count is not zero!!!")
+		//common.SH_Assert(currentPage.PinCount() >= 0, "BPM::FetchPPage Victim page's pin count is not zero!!!")
 		if currentPage != nil {
 			if currentPage.PinCount() != 0 {
-				fmt.Printf("BPM::FetchPage WLatch:%v RLatch:%v\n", currentPage.WLatchMap, currentPage.RLatchMap)
-				panic(fmt.Sprintf("BPM::FetchPage pin count of page to be cache out must be zero!!!. pageId:%d PinCount:%d", currentPage.GetPageId(), currentPage.PinCount()))
+				fmt.Printf("BPM::FetchPPage WLatch:%v RLatch:%v\n", currentPage.WLatchMap, currentPage.RLatchMap)
+				panic(fmt.Sprintf("BPM::FetchPPage pin count of page to be cache out must be zero!!!. pageId:%d PinCount:%d", currentPage.GetPageId(), currentPage.PinCount()))
 			}
 
 			if common.EnableDebug && common.ActiveLogKindSetting&common.CACHE_OUT_IN_INFO > 0 {
-				fmt.Printf("BPM::FetchPage Cache out occurs! pageId:%d requested pageId:%d\n", currentPage.GetPageId(), pageID)
+				fmt.Printf("BPM::FetchPPage Cache out occurs! pageId:%d requested pageId:%d\n", currentPage.GetPageId(), pageID)
 			}
 			if currentPage.IsDeallocated() {
 				b.reUsablePageList = append(b.reUsablePageList, currentPage.GetPageId())
@@ -78,7 +78,7 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 				currentPage.WUnlatch()
 			}
 			if common.EnableDebug {
-				common.ShPrintf(common.DEBUG_INFO, "FetchPage: page=%d is removed from pageTable.\n", currentPage.GetPageId())
+				common.ShPrintf(common.DEBUG_INFO, "FetchPPage: page=%d is removed from pageTable.\n", currentPage.GetPageId())
 			}
 			delete(b.pageTable, currentPage.GetPageId())
 		}
@@ -87,7 +87,7 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 	//data := make([]byte, common.PageSize)
 	data := directio.AlignedBlock(common.PageSize)
 	if common.EnableDebug && common.ActiveLogKindSetting&common.CACHE_OUT_IN_INFO > 0 {
-		fmt.Printf("BPM::FetchPage Cache in occurs! requested pageId:%d\n", pageID)
+		fmt.Printf("BPM::FetchPPage Cache in occurs! requested pageId:%d\n", pageID)
 	}
 	err := b.diskManager.ReadPage(pageID, data)
 	if err != nil {
@@ -105,7 +105,7 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 
 	if common.EnableDebug && common.ActiveLogKindSetting&common.PIN_COUNT_ASSERT > 0 {
 		common.SH_Assert(pg.PinCount() == 1,
-			fmt.Sprintf("BPM::FetchPage pin count must be one here when single thread execution!!!. pageId:%d", pg.GetPageId()))
+			fmt.Sprintf("BPM::FetchPPage pin count must be one here when single thread execution!!!. pageId:%d", pg.GetPageId()))
 	}
 
 	b.pageTable[pageID] = *frameID
@@ -113,7 +113,7 @@ func (b *BufferPoolManager) FetchPage(pageID types.PageID) *page.Page {
 	b.mutex.Unlock()
 
 	if common.EnableDebug {
-		common.ShPrintf(common.DEBUG_INFO, "FetchPage: PageId=%d PinCount=%d\n", pg.GetPageId(), pg.PinCount())
+		common.ShPrintf(common.DEBUG_INFO, "FetchPPage: PageId=%d PinCount=%d\n", pg.GetPageId(), pg.PinCount())
 	}
 	return pg
 }

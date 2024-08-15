@@ -1,7 +1,7 @@
 package interfaces
 
 type ParentPage interface {
-	DecPinCount()
+	DecPPinCount()
 	PinCount() int32
 	GetPageId() int32
 	DataAsSlice() []byte
