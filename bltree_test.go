@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/ryogrid/SamehadaDB/lib/recovery"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ryogrid/bltree-go-for-embedding/storage/buffer"
-	"github.com/ryogrid/bltree-go-for-embedding/storage/disk"
+	"github.com/ryogrid/SamehadaDB/lib/storage/buffer"
+	"github.com/ryogrid/SamehadaDB/lib/storage/disk"
 )
 
 func TestBLTree_collapseRoot(t *testing.T) {
@@ -80,8 +81,6 @@ func TestBLTree_cleanPage_full_page(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// ファイルの数値をすべてバイト配列に読み込む
-	// ファイルの内容はすべて文字列で、空白文字で区切られている
 	var data []byte
 	for {
 		var b byte
@@ -136,7 +135,8 @@ func TestBLTree_insert_and_find_embedding(t *testing.T) {
 	poolSize := uint32(10)
 
 	dm := disk.NewDiskManagerTest()
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 
 	os.Remove("data/bltree_insert_and_find_embedding.db")
 
@@ -186,7 +186,8 @@ func TestBLTree_insert_and_find_many_embedding(t *testing.T) {
 	poolSize := uint32(100)
 
 	dm := disk.NewDiskManagerTest()
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 
 	mgr := NewBufMgr("data/bltree_insert_and_find_many_embedding.db", 12, 36, bpm, nil)
 	bltree := NewBLTree(mgr)
@@ -234,7 +235,8 @@ func TestBLTree_insert_and_find_concurrently_embedding(t *testing.T) {
 
 	//dm := disk.NewDiskManagerImpl("TestBLTree_insert_and_find_concurrently_embedding.db")
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_insert_and_find_concurrently_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 
 	mgr := NewBufMgr("data/insert_and_find_concurrently_embedding.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*7, bpm, nil)
 
@@ -383,7 +385,8 @@ func TestBLTree_deleteMany_embedding(t *testing.T) {
 	poolSize := uint32(300)
 
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_deleteMany_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 
 	mgr := NewBufMgr("data/bltree_delete_many_embedding.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*7, bpm, nil)
 	bltree := NewBLTree(mgr)
@@ -458,7 +461,8 @@ func TestBLTree_deleteAll_embedding(t *testing.T) {
 	poolSize := uint32(300)
 
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_deleteAll_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 	mgr := NewBufMgr("data/bltree_delete_all.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*7, bpm, nil)
 	bltree := NewBLTree(mgr)
 
@@ -578,7 +582,8 @@ func TestBLTree_deleteManyConcurrently_embedding(t *testing.T) {
 	poolSize := uint32(300)
 
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_deleteManyConcurrently_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 	mgr := NewBufMgr("data/bltree_delete_many_concurrently.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*16, bpm, nil)
 
 	keyTotal := 1600000
@@ -668,7 +673,8 @@ func TestBLTree_deleteInsertRangeScanConcurrently_embedding(t *testing.T) {
 	poolSize := uint32(300)
 
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_deleteInsertRangeScanConcurrently_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 	mgr := NewBufMgr("data/bltree_delete_insert_range_scan_many_concurrently.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*16, bpm, nil)
 
 	keyTotal := 1600000
@@ -786,7 +792,8 @@ func TestBLTree_deleteManyConcurrentlyShuffle_embedding(t *testing.T) {
 	poolSize := uint32(300)
 
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_deleteManyConcurrently_shuffle_embedding.db")
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 	mgr := NewBufMgr("data/bltree_delete_many_shuffle_concurrently.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*16, bpm, nil)
 
 	keyTotal := 1600000
@@ -921,8 +928,9 @@ func TestBLTree_restart_embedding(t *testing.T) {
 
 	// use virtual disk manager which does file I/O on memory
 	dm := disk.NewVirtualDiskManagerImpl("TestBLTree_restart_embedding.db")
-	orgBpm := buffer.NewBufferPoolManager(poolSize, dm)
-	bpm := buffer.NewParentBufMgrImpl(orgBpm)
+	lmgr := recovery.NewLogManager(&dm)
+	orgBpm := buffer.NewBufferPoolManager(poolSize, dm, lmgr)
+	bpm := NewParentBufMgrImpl(orgBpm)
 
 	mgr := NewBufMgr("data/bltree_restart_embedding.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*2, bpm, nil)
 	bltree := NewBLTree(mgr)
@@ -959,7 +967,8 @@ func TestBLTree_restart_embedding(t *testing.T) {
 	//dm.ShutDown()
 
 	//dm = disk.NewDiskManagerImpl("TestBLTree_restart_embedding.db")
-	bpm = buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr = recovery.NewLogManager(&dm)
+	bpm = NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 	mgr = NewBufMgr("data/bltree_restart_embedding.db", 12, 48, bpm, &pageZeroShId)
 	bltree = NewBLTree(mgr)
 
@@ -1006,7 +1015,8 @@ func TestBLTree_insert_and_range_scan_embedding(t *testing.T) {
 	poolSize := uint32(10)
 
 	dm := disk.NewDiskManagerTest()
-	bpm := buffer.NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm))
+	lmgr := recovery.NewLogManager(&dm)
+	bpm := NewParentBufMgrImpl(buffer.NewBufferPoolManager(poolSize, dm, lmgr))
 
 	os.Remove("data/bltree_insert_and_range_scan_embedding.db")
 

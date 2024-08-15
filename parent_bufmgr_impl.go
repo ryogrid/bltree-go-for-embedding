@@ -1,21 +1,21 @@
-package buffer
+package blink_tree
 
 import (
+	"github.com/ryogrid/SamehadaDB/lib/storage/buffer"
+	"github.com/ryogrid/SamehadaDB/lib/types"
 	"github.com/ryogrid/bltree-go-for-embedding/interfaces"
-	"github.com/ryogrid/bltree-go-for-embedding/storage/page"
-	"github.com/ryogrid/bltree-go-for-embedding/types"
 )
 
 type ParentBufMgrImpl struct {
-	*BufferPoolManager
+	*buffer.BufferPoolManager
 }
 
-func NewParentBufMgrImpl(bpm *BufferPoolManager) interfaces.ParentBufMgr {
+func NewParentBufMgrImpl(bpm *buffer.BufferPoolManager) interfaces.ParentBufMgr {
 	return &ParentBufMgrImpl{bpm}
 }
 
 func (p *ParentBufMgrImpl) FetchPPage(pageID int32) interfaces.ParentPage {
-	return &page.ParentPageImpl{p.FetchPage(types.PageID(pageID))}
+	return &ParentPageImpl{p.FetchPage(types.PageID(pageID))}
 }
 
 func (p *ParentBufMgrImpl) UnpinPPage(pageID int32, isDirty bool) error {
@@ -23,7 +23,7 @@ func (p *ParentBufMgrImpl) UnpinPPage(pageID int32, isDirty bool) error {
 }
 
 func (p *ParentBufMgrImpl) NewPPage() interfaces.ParentPage {
-	return &page.ParentPageImpl{p.NewPage()}
+	return &ParentPageImpl{p.NewPage()}
 }
 
 func (p *ParentBufMgrImpl) DeallocatePPage(pageID int32, isNoWait bool) error {

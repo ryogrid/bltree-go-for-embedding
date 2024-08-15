@@ -1,7 +1,9 @@
-package page
+package blink_tree
+
+import "github.com/ryogrid/SamehadaDB/lib/storage/page"
 
 type ParentPageImpl struct {
-	*Page
+	*page.Page
 }
 
 func (p *ParentPageImpl) DecPPinCount() {
