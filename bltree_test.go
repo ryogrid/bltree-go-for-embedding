@@ -3,16 +3,12 @@ package blink_tree
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestBLTree_collapseRoot(t *testing.T) {
-	_ = os.Remove("data/collapse_root_test.db")
-
 	type fields struct {
 		mgr *BufMgr
 	}
@@ -24,7 +20,7 @@ func TestBLTree_collapseRoot(t *testing.T) {
 		{
 			name: "collapse root",
 			fields: fields{
-				mgr: NewBufMgr("data/collapse_root_test.db", 13, 20, nil, nil),
+				mgr: NewBufMgr(13, 20, NewParentBufMgrDummy(), nil),
 			},
 			want: BLTErrOk,
 		},
@@ -66,51 +62,9 @@ func TestBLTree_collapseRoot(t *testing.T) {
 	}
 }
 
-func TestBLTree_cleanPage_full_page(t *testing.T) {
-	_ = os.Remove("data/bltree_clean_page.db")
-	mgr := NewBufMgr("data/bltree_clean_page.db", 15, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
-	bltree := NewBLTree(mgr)
-
-	f, err := os.OpenFile("testdata/page_for_clean", os.O_RDWR, 0666)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var data []byte
-	for {
-		var b byte
-		_, err := fmt.Fscanf(f, "%d", &b)
-		if err != nil {
-			break
-		}
-		data = append(data, b)
-	}
-	fmt.Printf("size: %v\n", len(data))
-
-	set := PageSet{
-		page:  NewPage(mgr.pageDataSize),
-		latch: &Latchs{},
-	}
-	copy(set.page.Data, data)
-	set.page.PageHeader = PageHeader{
-		Cnt:     1214,
-		Act:     1170,
-		Min:     7302,
-		Garbage: 6720,
-		Bits:    15,
-		Free:    false,
-		Lvl:     0,
-		Kill:    false,
-		Right:   [BtId]byte{0, 0, 0, 0, 1, 74},
-	}
-	res := bltree.cleanPage(&set, 8, 439, BtId)
-	if res != 0 {
-		t.Errorf("cleanPage() = %v, want %v", res, 0)
-	}
-}
-
 func TestBLTree_insert_and_find(t *testing.T) {
-	mgr := NewBufMgr("data/bltree_insert_and_find.db", 13, 20, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, 20, pbm, nil)
 	bltree := NewBLTree(mgr)
 	if valLen, _, _ := bltree.FindKey([]byte{1, 1, 1, 1}, BtId); valLen >= 0 {
 		t.Errorf("FindKey() = %v, want %v", valLen, -1)
@@ -127,8 +81,8 @@ func TestBLTree_insert_and_find(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_many(t *testing.T) {
-	_ = os.Remove(`data/bltree_insert_and_find_many.db`)
-	mgr := NewBufMgr("data/bltree_insert_and_find_many.db", 12, 36, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(12, 36, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	num := uint64(160000)
@@ -151,8 +105,8 @@ func TestBLTree_insert_and_find_many(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_concurrently(t *testing.T) {
-	_ = os.Remove(`data/insert_and_find_concurrently.db`)
-	mgr := NewBufMgr("data/insert_and_find_concurrently.db", 13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 
 	keyTotal := 1600000
 
@@ -167,8 +121,7 @@ func TestBLTree_insert_and_find_concurrently(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_concurrently_by_little_endian(t *testing.T) {
-	_ = os.Remove(`data/insert_and_find_concurrently_by_little_endian.db`)
-	mgr := NewBufMgr("data/insert_and_find_concurrently_by_little_endian.db", 13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
 
 	keyTotal := 1600000
 
@@ -183,7 +136,8 @@ func TestBLTree_insert_and_find_concurrently_by_little_endian(t *testing.T) {
 }
 
 func TestBLTree_delete(t *testing.T) {
-	mgr := NewBufMgr("data/bltree_delete.db", 13, 20, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, 20, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	key := []byte{1, 1, 1, 1}
@@ -202,8 +156,8 @@ func TestBLTree_delete(t *testing.T) {
 }
 
 func TestBLTree_deleteMany(t *testing.T) {
-	_ = os.Remove(`data/bltree_delete_many.db`)
-	mgr := NewBufMgr("data/bltree_delete_many.db", 13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	keyTotal := 160000
@@ -240,8 +194,8 @@ func TestBLTree_deleteMany(t *testing.T) {
 }
 
 func TestBLTree_deleteAll(t *testing.T) {
-	_ = os.Remove(`data/bltree_delete_all.db`)
-	mgr := NewBufMgr("data/bltree_delete_all.db", 13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	keyTotal := 1600000
@@ -270,8 +224,8 @@ func TestBLTree_deleteAll(t *testing.T) {
 }
 
 func TestBLTree_deleteManyConcurrently(t *testing.T) {
-	_ = os.Remove("data/bltree_delete_many_concurrently.db")
-	mgr := NewBufMgr("data/bltree_delete_many_concurrently.db", 12, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 
 	keyTotal := 1600000
 	routineNum := 7
@@ -354,8 +308,8 @@ func TestBLTree_deleteManyConcurrently(t *testing.T) {
 }
 
 func TestBLTree_restart(t *testing.T) {
-	_ = os.Remove(`data/bltree_restart.db`)
-	mgr := NewBufMgr("data/bltree_restart.db", 13, 48, nil, nil)
+	pbm := NewParentBufMgrDummy()
+	mgr := NewBufMgr(13, 48, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	firstNum := uint64(1000)
@@ -369,7 +323,7 @@ func TestBLTree_restart(t *testing.T) {
 	}
 
 	mgr.Close()
-	mgr = NewBufMgr("data/bltree_restart.db", 15, 48, nil, nil)
+	mgr = NewBufMgr(15, 48, nil, nil)
 	bltree = NewBLTree(mgr)
 
 	secondNum := uint64(2000)

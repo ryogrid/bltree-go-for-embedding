@@ -2,16 +2,14 @@ package blink_tree
 
 import (
 	"bytes"
-	"os"
 	"reflect"
 	"testing"
 )
 
 func TestNewBufMgr(t *testing.T) {
 	type args struct {
-		filename string
-		bits     uint8
-		nodeMax  uint
+		bits    uint8
+		nodeMax uint
 	}
 	tests := []struct {
 		name string
@@ -20,16 +18,15 @@ func TestNewBufMgr(t *testing.T) {
 		{
 			name: "create a new buffer manager",
 			args: args{
-				filename: "data/buf_mgr_test.db",
-				bits:     12,
-				nodeMax:  100,
+				bits:    12,
+				nodeMax: 100,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.args.filename)
-			mgr := NewBufMgr(tt.args.filename, tt.args.bits, tt.args.nodeMax, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(tt.args.bits, tt.args.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -50,7 +47,6 @@ func TestNewBufMgr(t *testing.T) {
 // TODO: test after increment latchDeployed
 func TestBufMgr_poolAudit(t *testing.T) {
 	type args struct {
-		name    string
 		bits    uint8
 		nodeMax uint
 	}
@@ -61,7 +57,6 @@ func TestBufMgr_poolAudit(t *testing.T) {
 		{
 			name: "pool audit",
 			args: args{
-				name:    "data/buf_mgr_test.db",
 				bits:    12,
 				nodeMax: 100,
 			},
@@ -69,8 +64,8 @@ func TestBufMgr_poolAudit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.args.name)
-			mgr := NewBufMgr(tt.args.name, tt.args.bits, tt.args.nodeMax, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(tt.args.bits, tt.args.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -175,13 +170,11 @@ func TestBufMgr_PinLatch(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		filename    string
 		args        args
 		wantLatched bool
 	}{
 		{
-			name:     "pin latch",
-			filename: "data/pin_latch_test.db",
+			name: "pin latch",
 			args: args{
 				pageNo: 3,
 				loadIt: false,
@@ -191,8 +184,7 @@ func TestBufMgr_PinLatch(t *testing.T) {
 			wantLatched: true,
 		},
 		{
-			name:     "pin latch with loadIt",
-			filename: "data/pin_latch_test.db",
+			name: "pin latch with loadIt",
 			args: args{
 				pageNo: 4,
 				loadIt: true,
@@ -204,8 +196,8 @@ func TestBufMgr_PinLatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.filename)
-			mgr := NewBufMgr(tt.filename, 15, 20, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(15, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -241,13 +233,11 @@ func TestBufMgr_PinLatch_Twice(t *testing.T) {
 		writes uint
 	}
 	tests := []struct {
-		name     string
-		filename string
-		args     args
+		name string
+		args args
 	}{
 		{
-			name:     "pin latch",
-			filename: "data/pin_latch_twice_test.db",
+			name: "pin latch",
 			args: args{
 				pageNo: 3,
 				reads:  0,
@@ -257,8 +247,8 @@ func TestBufMgr_PinLatch_Twice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.filename)
-			mgr := NewBufMgr(tt.filename, 15, 20, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(15, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -279,7 +269,6 @@ func TestBufMgr_PinLatch_Twice(t *testing.T) {
 
 func TestBufMgr_PinLatch_ClockWise(t *testing.T) {
 	type fields struct {
-		filename    string
 		nodeMax     uint
 		unpinPageNo Uid
 	}
@@ -296,7 +285,6 @@ func TestBufMgr_PinLatch_ClockWise(t *testing.T) {
 		{
 			name: "pin latch",
 			fields: fields{
-				filename:    "data/pin_latch_close_wise_test.db",
 				nodeMax:     32,
 				unpinPageNo: 9,
 			},
@@ -309,8 +297,8 @@ func TestBufMgr_PinLatch_ClockWise(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.fields.filename)
-			mgr := NewBufMgr(tt.fields.filename, 15, tt.fields.nodeMax, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(15, tt.fields.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -341,8 +329,7 @@ func TestBufMgr_PinLatch_ClockWise(t *testing.T) {
 
 func TestBufMgr_UnpinLatch_ClockWise(t *testing.T) {
 	type fields struct {
-		filename string
-		nodeMax  uint
+		nodeMax uint
 	}
 	type args struct {
 		reads  uint
@@ -356,8 +343,7 @@ func TestBufMgr_UnpinLatch_ClockWise(t *testing.T) {
 		{
 			name: "unpin latch",
 			fields: fields{
-				filename: "data/unpin_latch_close_wise_test.db",
-				nodeMax:  32,
+				nodeMax: 32,
 			},
 			args: args{
 				reads:  0,
@@ -367,8 +353,8 @@ func TestBufMgr_UnpinLatch_ClockWise(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.fields.filename)
-			mgr := NewBufMgr(tt.fields.filename, 15, tt.fields.nodeMax, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(15, tt.fields.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -399,13 +385,11 @@ func TestBufMgr_NewPage(t *testing.T) {
 		writes  uint
 	}
 	tests := []struct {
-		name     string
-		filename string
-		args     args
+		name string
+		args args
 	}{
 		{
-			name:     "create a new page without reusing empty page",
-			filename: "data/new_page_test.db",
+			name: "create a new page without reusing empty page",
 			args: args{
 				pageSet: PageSet{},
 				page:    Page{Data: []byte{1, 2, 3, 4, 5, 6}},
@@ -416,8 +400,8 @@ func TestBufMgr_NewPage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Remove(tt.filename)
-			mgr := NewBufMgr(tt.filename, 15, 20, nil, nil)
+			pbm := NewParentBufMgrDummy()
+			mgr := NewBufMgr(15, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
