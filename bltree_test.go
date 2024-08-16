@@ -150,7 +150,7 @@ func TestBLTree_insert_and_find_many(t *testing.T) {
 	}
 }
 
-func TestBLTree_insert_and_find_concurrently_org(t *testing.T) {
+func TestBLTree_insert_and_find_concurrently(t *testing.T) {
 	_ = os.Remove(`data/insert_and_find_concurrently.db`)
 	mgr := NewBufMgr("data/insert_and_find_concurrently.db", 13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
 
