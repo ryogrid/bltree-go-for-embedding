@@ -76,14 +76,14 @@ func NewBufMgr(bits uint8, nodeMax uint, pbm interfaces.ParentBufMgr, lastPageZe
 	if lastPageZeroId != nil {
 		var page Page
 
-		shPageZero := mgr.pbm.FetchPPage(int32(*lastPageZeroId))
-		if shPageZero == nil {
+		ppageZero := mgr.pbm.FetchPPage(int32(*lastPageZeroId))
+		if ppageZero == nil {
 			panic("failed to fetch page")
 		}
 
-		page.Data = shPageZero.DataAsSlice()[PageHeaderSize:]
-		mgr.pageZero.alloc = shPageZero.DataAsSlice()
-		mgr.loadPageIdMapping(shPageZero)
+		page.Data = ppageZero.DataAsSlice()[PageHeaderSize:]
+		mgr.pageZero.alloc = ppageZero.DataAsSlice()
+		mgr.loadPageIdMapping(ppageZero)
 
 		if err2 := binary.Read(bytes.NewReader(mgr.pageZero.alloc), binary.LittleEndian, &page.PageHeader); err2 != nil {
 			panic(fmt.Sprintf("Unable to read btree file: %v\n", err2))
@@ -159,14 +159,14 @@ func NewBufMgr(bits uint8, nodeMax uint, pbm interfaces.ParentBufMgr, lastPageZe
 func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 	//fmt.Println("PageIn pageNo: ", pageNo)
 
-	if shPageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
-		shPage := mgr.pbm.FetchPPage(shPageId.(int32))
-		if shPage == nil {
+	if ppageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
+		ppage := mgr.pbm.FetchPPage(ppageId.(int32))
+		if ppage == nil {
 			panic("failed to fetch page")
 		}
-		headerBuf := bytes.NewBuffer(shPage.DataAsSlice()[:PageHeaderSize])
+		headerBuf := bytes.NewBuffer(ppage.DataAsSlice()[:PageHeaderSize])
 		binary.Read(headerBuf, binary.LittleEndian, &page.PageHeader)
-		page.Data = (shPage.DataAsSlice())[PageHeaderSize:]
+		page.Data = (ppage.DataAsSlice())[PageHeaderSize:]
 	} else {
 		panic("page mapping not found")
 	}
@@ -179,16 +179,16 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 	//fmt.Println("PageOut pageNo: ", pageNo)
 
-	shPageId := int32(-1)
+	ppageId := int32(-1)
 	isNoEntry := false
 	if val, ok := mgr.pageIdConvMap.Load(pageNo); !ok {
 		isNoEntry = true
-		shPageId = int32(-1)
+		ppageId = int32(-1)
 	} else {
-		shPageId = val.(int32)
+		ppageId = val.(int32)
 	}
 
-	var shPage interfaces.ParentPage = nil
+	var ppage interfaces.ParentPage = nil
 
 	if isNoEntry {
 		// called for not existing page case
@@ -197,32 +197,32 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 
 		// create new page on parent's buffer pool and db file
 		// 1 pin count is left
-		shPage = mgr.pbm.NewPPage()
-		if shPage == nil {
+		ppage = mgr.pbm.NewPPage()
+		if ppage == nil {
 			panic("failed to create new page")
 		}
 		if isDirty {
-			copy(shPage.DataAsSlice()[PageHeaderSize:], page.Data)
+			copy(ppage.DataAsSlice()[PageHeaderSize:], page.Data)
 			headerBuf := bytes.NewBuffer(make([]byte, 0, PageHeaderSize))
 			binary.Write(headerBuf, binary.LittleEndian, page.PageHeader)
 			headerBytes := headerBuf.Bytes()
-			copy(shPage.DataAsSlice()[:PageHeaderSize], headerBytes)
+			copy(ppage.DataAsSlice()[:PageHeaderSize], headerBytes)
 			if _, ok := mgr.pageIdConvMap.Load(pageNo); ok {
 				panic("page already exists")
 			}
 		}
-		shPageId = shPage.GetPPageId()
-		mgr.pageIdConvMap.Store(pageNo, shPageId)
+		ppageId = ppage.GetPPageId()
+		mgr.pageIdConvMap.Store(pageNo, ppageId)
 	}
 
-	if shPage == nil {
-		shPage = mgr.pbm.FetchPPage(shPageId)
-		if shPage == nil {
+	if ppage == nil {
+		ppage = mgr.pbm.FetchPPage(ppageId)
+		if ppage == nil {
 			panic("failed to fetch page")
 		}
 		// decrement pin count because the count is incremented at FetchPPage
-		if shPage.PPinCount() == 2 {
-			shPage.DecPPinCount()
+		if ppage.PPinCount() == 2 {
+			ppage.DecPPinCount()
 		}
 	}
 
@@ -230,12 +230,12 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		headerBuf := bytes.NewBuffer(make([]byte, 0, PageHeaderSize))
 		binary.Write(headerBuf, binary.LittleEndian, page.PageHeader)
 		headerBytes := headerBuf.Bytes()
-		copy(shPage.DataAsSlice()[:PageHeaderSize], headerBytes)
-		copy(shPage.DataAsSlice()[PageHeaderSize:], page.Data)
+		copy(ppage.DataAsSlice()[:PageHeaderSize], headerBytes)
+		copy(ppage.DataAsSlice()[PageHeaderSize:], page.Data)
 	}
-	mgr.pbm.UnpinPPage(shPageId, isDirty)
+	mgr.pbm.UnpinPPage(ppageId, isDirty)
 
-	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "shPageId:", shPageId, "pin count: ", shPage.PPinCount())
+	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "ppageId:", ppageId, "pin count: ", ppage.PPinCount())
 
 	return BLTErrOk
 }
@@ -310,8 +310,8 @@ func (mgr *BufMgr) deleterFreePages() {
 	freePageMap := makeFreePageMap()
 	freePageMap.Range(func(key, value interface{}) bool {
 		pageNo := key.(Uid)
-		if shPageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
-			mgr.pbm.DeallocatePPage(shPageId.(int32), true)
+		if ppageId, ok := mgr.pageIdConvMap.Load(pageNo); ok {
+			mgr.pbm.DeallocatePPage(ppageId.(int32), true)
 			mgr.pageIdConvMap.Delete(pageNo)
 		}
 		//fmt.Println("deallocate free page: ", pageNo)
@@ -336,18 +336,18 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 
 	serializeIdMappingEntryFunc := func(key, value interface{}) {
 		pageNo := key.(Uid)
-		shPageId := value.(int32)
+		ppageId := value.(int32)
 		buf := make([]byte, PageIdMappingEntrySize)
 		binary.LittleEndian.PutUint64(buf[:PageIdMappingBLETreePageSize], uint64(pageNo))
-		binary.LittleEndian.PutUint32(buf[PageIdMappingBLETreePageSize:PageIdMappingBLETreePageSize+PageIdMappingShPageSize], uint32(shPageId))
-		offset := (NextShPageIdForIdMappingSize + EntryCountSize) + mappingCnt*PageIdMappingEntrySize
+		binary.LittleEndian.PutUint32(buf[PageIdMappingBLETreePageSize:PageIdMappingBLETreePageSize+PageIdMappingPPageSize], uint32(ppageId))
+		offset := (NextPPageIdForIdMappingSize + EntryCountSize) + mappingCnt*PageIdMappingEntrySize
 		copy(curPage.Data[offset:offset+PageIdMappingEntrySize], buf)
 	}
 
-	maxSerializeNum := (mgr.pageDataSize - (NextShPageIdForIdMappingSize + EntryCountSize)) / PageIdMappingEntrySize
+	maxSerializeNum := (mgr.pageDataSize - (NextPPageIdForIdMappingSize + EntryCountSize)) / PageIdMappingEntrySize
 
 	curPage.Data = pageZero.Data
-	pageId := mgr.GetMappedShPageIdOfPageZero()
+	pageId := mgr.GetMappedPPageIdOfPageZero()
 
 	isPageZero := true
 
@@ -358,17 +358,17 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 		mappingCnt++
 		if mappingCnt >= maxSerializeNum {
 			// reached capacity limit
-			shPage := mgr.pbm.NewPPage()
-			if shPage == nil {
+			ppage := mgr.pbm.NewPPage()
+			if ppage == nil {
 				panic("failed to create new page")
 			}
-			nextPageId := shPage.GetPPageId()
+			nextPageId := ppage.GetPPageId()
 			// write mapping data header
-			buf2 := make([]byte, ShPageIdSize)
+			buf2 := make([]byte, PPageIdSize)
 			binary.LittleEndian.PutUint32(buf2, uint32(nextPageId))
-			copy(curPage.Data[:NextShPageIdForIdMappingSize], buf2)
+			copy(curPage.Data[:NextPPageIdForIdMappingSize], buf2)
 			binary.LittleEndian.PutUint32(buf2, mappingCnt)
-			copy(curPage.Data[NextShPageIdForIdMappingSize:NextShPageIdForIdMappingSize+EntryCountSize], buf2)
+			copy(curPage.Data[NextPPageIdForIdMappingSize:NextPPageIdForIdMappingSize+EntryCountSize], buf2)
 
 			// write back to parent's buffer pool
 			if isPageZero {
@@ -382,7 +382,7 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 
 			pageId = nextPageId
 			// page header is not copied due to it is not used
-			curPage.Data = shPage.DataAsSlice()[PageHeaderSize:]
+			curPage.Data = ppage.DataAsSlice()[PageHeaderSize:]
 			mappingCnt = 0
 		}
 		return true
@@ -391,13 +391,13 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 	mgr.pageIdConvMap.Range(itrFunc)
 
 	// write mapping data header
-	buf := make([]byte, ShPageIdSize)
+	buf := make([]byte, PPageIdSize)
 	// -1 as int32
 	// this is a marker for the end of mapping data
 	binary.LittleEndian.PutUint32(buf, uint32(0xffffffff))
-	copy(curPage.Data[:NextShPageIdForIdMappingSize], buf)
+	copy(curPage.Data[:NextPPageIdForIdMappingSize], buf)
 	binary.LittleEndian.PutUint32(buf, mappingCnt)
-	copy(curPage.Data[NextShPageIdForIdMappingSize:NextShPageIdForIdMappingSize+EntryCountSize], buf)
+	copy(curPage.Data[NextPPageIdForIdMappingSize:NextPPageIdForIdMappingSize+EntryCountSize], buf)
 
 	// write back to parent's buffer pool
 	if !isPageZero {
@@ -410,41 +410,41 @@ func (mgr *BufMgr) serializePageIdMappingToPage(pageZero *Page) {
 func (mgr *BufMgr) loadPageIdMapping(pageZero interfaces.ParentPage) {
 	// deserialize page mapping data from page zero
 	isPageZero := true
-	var curShPage interfaces.ParentPage
-	curShPage = pageZero
+	var curPPage interfaces.ParentPage
+	curPPage = pageZero
 	for {
 		offset := PageHeaderSize
-		mappingCnt := binary.LittleEndian.Uint32(curShPage.DataAsSlice()[offset+NextShPageIdForIdMappingSize : offset+NextShPageIdForIdMappingSize+EntryCountSize])
-		offset += NextShPageIdForIdMappingSize + EntryCountSize
+		mappingCnt := binary.LittleEndian.Uint32(curPPage.DataAsSlice()[offset+NextPPageIdForIdMappingSize : offset+NextPPageIdForIdMappingSize+EntryCountSize])
+		offset += NextPPageIdForIdMappingSize + EntryCountSize
 		for ii := 0; ii < int(mappingCnt); ii++ {
-			pageNo := Uid(binary.LittleEndian.Uint64(curShPage.DataAsSlice()[offset : offset+PageIdMappingBLETreePageSize]))
+			pageNo := Uid(binary.LittleEndian.Uint64(curPPage.DataAsSlice()[offset : offset+PageIdMappingBLETreePageSize]))
 			offset += PageIdMappingBLETreePageSize
-			shPageId := int32(binary.LittleEndian.Uint32(curShPage.DataAsSlice()[offset : offset+PageIdMappingShPageSize]))
-			offset += PageIdMappingShPageSize
-			mgr.pageIdConvMap.Store(pageNo, shPageId)
+			ppageId := int32(binary.LittleEndian.Uint32(curPPage.DataAsSlice()[offset : offset+PageIdMappingPPageSize]))
+			offset += PageIdMappingPPageSize
+			mgr.pageIdConvMap.Store(pageNo, ppageId)
 		}
 		offset = PageHeaderSize
 
-		nextShPageNo := int32(binary.LittleEndian.Uint32(curShPage.DataAsSlice()[offset : offset+NextShPageIdForIdMappingSize]))
-		if nextShPageNo == -1 {
+		nextPPageNo := int32(binary.LittleEndian.Uint32(curPPage.DataAsSlice()[offset : offset+NextPPageIdForIdMappingSize]))
+		if nextPPageNo == -1 {
 			// page chain end
 			if !isPageZero {
-				mgr.pbm.UnpinPPage(curShPage.GetPPageId(), false)
+				mgr.pbm.UnpinPPage(curPPage.GetPPageId(), false)
 			}
 			return
 		} else {
-			nextShPage := mgr.pbm.FetchPPage(nextShPageNo)
-			if nextShPage == nil {
+			nextPPage := mgr.pbm.FetchPPage(nextPPageNo)
+			if nextPPage == nil {
 				panic("failed to fetch page")
 			}
 			if !isPageZero {
 				// unpin current page
-				mgr.pbm.UnpinPPage(curShPage.GetPPageId(), false)
+				mgr.pbm.UnpinPPage(curPPage.GetPPageId(), false)
 				// deallocate current page for reuse
-				mgr.pbm.DeallocatePPage(curShPage.GetPPageId(), true)
+				mgr.pbm.DeallocatePPage(curPPage.GetPPageId(), true)
 			}
 			isPageZero = false
-			curShPage = nextShPage
+			curPPage = nextPPage
 		}
 	}
 }
@@ -863,7 +863,7 @@ func (mgr *BufMgr) PageUnlock(mode BLTLockMode, latch *Latchs) {
 	}
 }
 
-func (mgr *BufMgr) GetMappedShPageIdOfPageZero() int32 {
+func (mgr *BufMgr) GetMappedPPageIdOfPageZero() int32 {
 	if val, ok := mgr.pageIdConvMap.Load(Uid(0)); ok {
 		ret := val.(int32)
 		return ret

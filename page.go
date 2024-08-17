@@ -31,14 +31,14 @@ const (
 	PageHeaderSize = 26 // size of page header in bytes
 	SlotSize       = 6  // size of slot in bytes
 
-	ShPageIdSize = 4
+	PPageIdSize = 4
 	// constants for page ID mapping entries serialization
 	// and free page ID list serialization
-	NextShPageIdForIdMappingSize = ShPageIdSize
+	NextPPageIdForIdMappingSize  = PPageIdSize
 	EntryCountSize               = 4
 	PageIdMappingBLETreePageSize = 8
-	PageIdMappingShPageSize      = ShPageIdSize
-	PageIdMappingEntrySize       = PageIdMappingBLETreePageSize + PageIdMappingShPageSize
+	PageIdMappingPPageSize       = PPageIdSize
+	PageIdMappingEntrySize       = PageIdMappingBLETreePageSize + PageIdMappingPPageSize
 
 	// constants for free page entries serialization
 	FreePageInfoSize = 8

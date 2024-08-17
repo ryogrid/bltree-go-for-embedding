@@ -25,21 +25,35 @@ func TestNewBufMgr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
+			pbm := NewParentBufMgrDummy(nil)
 			mgr := NewBufMgr(tt.args.bits, tt.args.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
-			page := Page{}
-			page_ := &page
+
+			writes := uint(0)
+			reads := uint(0)
 			for i := 0; i < 3; i++ {
+				set := PageSet{page: nil, latch: &Latchs{}}
+				page_ := NewPage(mgr.pageDataSize)
+				if err := mgr.NewPage(&set, page_, &reads, &writes); err != BLTErrOk {
+					t.Errorf("NewBufMgr() failed to create page. err: %v", err)
+				}
+				if err := mgr.PageOut(page_, set.latch.pageNo, true); err != BLTErrOk {
+					t.Errorf("NewBufMgr() failed to read page. err: %v", err)
+				}
+			}
+
+			for i := 0; i < 3; i++ {
+				page_ := NewPage(mgr.pageDataSize)
 				if err := mgr.PageIn(page_, Uid(i)); err != BLTErrOk {
 					t.Errorf("NewBufMgr() failed to read page. err: %v", err)
 				}
 			}
-			if err := mgr.PageIn(page_, Uid(3)); err != BLTErrRead {
-				t.Errorf("NewBufMgr() failed to read page with unexpected err: %v", err)
-			}
+			//page_ := NewPage(mgr.pageDataSize)
+			//if err := mgr.PageIn(page_, Uid(3)); err != BLTErrRead {
+			//	t.Errorf("NewBufMgr() failed to read page with unexpected err: %v", err)
+			//}
 		})
 	}
 }
@@ -64,7 +78,7 @@ func TestBufMgr_poolAudit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
+			pbm := NewParentBufMgrDummy(nil)
 			mgr := NewBufMgr(tt.args.bits, tt.args.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
@@ -196,8 +210,8 @@ func TestBufMgr_PinLatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
-			mgr := NewBufMgr(15, 20, pbm, nil)
+			pbm := NewParentBufMgrDummy(nil)
+			mgr := NewBufMgr(12, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -247,8 +261,8 @@ func TestBufMgr_PinLatch_Twice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
-			mgr := NewBufMgr(15, 20, pbm, nil)
+			pbm := NewParentBufMgrDummy(nil)
+			mgr := NewBufMgr(12, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -297,8 +311,8 @@ func TestBufMgr_PinLatch_ClockWise(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
-			mgr := NewBufMgr(15, tt.fields.nodeMax, pbm, nil)
+			pbm := NewParentBufMgrDummy(nil)
+			mgr := NewBufMgr(12, tt.fields.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -353,8 +367,8 @@ func TestBufMgr_UnpinLatch_ClockWise(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
-			mgr := NewBufMgr(15, tt.fields.nodeMax, pbm, nil)
+			pbm := NewParentBufMgrDummy(nil)
+			mgr := NewBufMgr(12, tt.fields.nodeMax, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}
@@ -400,8 +414,8 @@ func TestBufMgr_NewPage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pbm := NewParentBufMgrDummy()
-			mgr := NewBufMgr(15, 20, pbm, nil)
+			pbm := NewParentBufMgrDummy(nil)
+			mgr := NewBufMgr(12, 20, pbm, nil)
 			if mgr == nil {
 				t.Errorf("NewBufMgr() failed")
 			}

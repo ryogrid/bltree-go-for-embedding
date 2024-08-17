@@ -20,7 +20,7 @@ func TestBLTree_collapseRoot(t *testing.T) {
 		{
 			name: "collapse root",
 			fields: fields{
-				mgr: NewBufMgr(13, 20, NewParentBufMgrDummy(), nil),
+				mgr: NewBufMgr(12, 20, NewParentBufMgrDummy(nil), nil),
 			},
 			want: BLTErrOk,
 		},
@@ -63,8 +63,8 @@ func TestBLTree_collapseRoot(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, 20, pbm, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, 20, pbm, nil)
 	bltree := NewBLTree(mgr)
 	if valLen, _, _ := bltree.FindKey([]byte{1, 1, 1, 1}, BtId); valLen >= 0 {
 		t.Errorf("FindKey() = %v, want %v", valLen, -1)
@@ -81,7 +81,7 @@ func TestBLTree_insert_and_find(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_many(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
+	pbm := NewParentBufMgrDummy(nil)
 	mgr := NewBufMgr(12, 36, pbm, nil)
 	bltree := NewBLTree(mgr)
 
@@ -105,8 +105,8 @@ func TestBLTree_insert_and_find_many(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_concurrently(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 
 	keyTotal := 1600000
 
@@ -121,7 +121,8 @@ func TestBLTree_insert_and_find_concurrently(t *testing.T) {
 }
 
 func TestBLTree_insert_and_find_concurrently_by_little_endian(t *testing.T) {
-	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, nil, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 
 	keyTotal := 1600000
 
@@ -136,8 +137,8 @@ func TestBLTree_insert_and_find_concurrently_by_little_endian(t *testing.T) {
 }
 
 func TestBLTree_delete(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, 20, pbm, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, 20, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	key := []byte{1, 1, 1, 1}
@@ -156,8 +157,8 @@ func TestBLTree_delete(t *testing.T) {
 }
 
 func TestBLTree_deleteMany(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	keyTotal := 160000
@@ -194,8 +195,8 @@ func TestBLTree_deleteMany(t *testing.T) {
 }
 
 func TestBLTree_deleteAll(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	keyTotal := 1600000
@@ -224,7 +225,7 @@ func TestBLTree_deleteAll(t *testing.T) {
 }
 
 func TestBLTree_deleteManyConcurrently(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
+	pbm := NewParentBufMgrDummy(nil)
 	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
 
 	keyTotal := 1600000
@@ -308,8 +309,10 @@ func TestBLTree_deleteManyConcurrently(t *testing.T) {
 }
 
 func TestBLTree_restart(t *testing.T) {
-	pbm := NewParentBufMgrDummy()
-	mgr := NewBufMgr(13, 48, pbm, nil)
+	pbmPageMap := &sync.Map{}
+
+	pbm := NewParentBufMgrDummy(pbmPageMap)
+	mgr := NewBufMgr(12, 48, pbm, nil)
 	bltree := NewBLTree(mgr)
 
 	firstNum := uint64(1000)
@@ -323,7 +326,11 @@ func TestBLTree_restart(t *testing.T) {
 	}
 
 	mgr.Close()
-	mgr = NewBufMgr(15, 48, nil, nil)
+
+	lastPageZeroId := mgr.GetMappedPPageIdOfPageZero()
+	// restore ParentBufMgr and BufMgr
+	pbm = NewParentBufMgrDummy(pbmPageMap)
+	mgr = NewBufMgr(12, 48, pbm, &lastPageZeroId)
 	bltree = NewBLTree(mgr)
 
 	secondNum := uint64(2000)
