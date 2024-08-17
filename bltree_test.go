@@ -122,7 +122,7 @@ func TestBLTree_insert_and_find_concurrently(t *testing.T) {
 
 func TestBLTree_insert_and_find_concurrently_by_little_endian(t *testing.T) {
 	pbm := NewParentBufMgrDummy(nil)
-	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7*2, pbm, nil)
 
 	keyTotal := 1600000
 
@@ -226,7 +226,7 @@ func TestBLTree_deleteAll(t *testing.T) {
 
 func TestBLTree_deleteManyConcurrently(t *testing.T) {
 	pbm := NewParentBufMgrDummy(nil)
-	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7, pbm, nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7*2, pbm, nil)
 
 	keyTotal := 1600000
 	routineNum := 7
