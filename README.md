@@ -8,6 +8,7 @@
 - blink-tree-go has own buffer manager
 - But if you want to use blink-tree-go on your DBMS project, you should want to use your buffer manager for memory management
 - For realization of memory management with your buffer manager, bltree-go-for-embedding integrates buffer manager of blink-tree-go and one of yours
+  - Buffer manager (BufMgr) of bltree-go-for-embedding treat your buffer manager as some storage or something which offers persistence
 - You need only to implement ParentBufMgr interface and ParentPage interface
 - Then you only pass the object of ParentBufMgr interface implemented class to factory function of BufMgr and create BLTree object with it
 
