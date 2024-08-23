@@ -971,7 +971,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		val := curSet.page.Value(slot)
 
 		// if upperKey is nil, then this condition is always false
-		if bytes.Compare(key, upperKey) < 0 {
+		if bytes.Compare(key, upperKey) > 0 {
 			return false
 		}
 
