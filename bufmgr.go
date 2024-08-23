@@ -41,7 +41,7 @@ type (
 
 func (z *PageZero) AllocRight() *[BtId]byte {
 	rightStart := 4*4 + 1 + 1 + 1 + 1
-	return (*[6]byte)(z.alloc[rightStart : rightStart+6])
+	return (*[8]byte)(z.alloc[rightStart : rightStart+8])
 }
 
 func (z *PageZero) SetAllocRight(pageNo Uid) {

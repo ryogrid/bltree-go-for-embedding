@@ -105,14 +105,14 @@ func TestPageZero_AllocRight(t *testing.T) {
 					0, 0, 0, 0, // Act
 					0, 0, 0, 0, // Min
 					0, 0, 0, 0, // Garbase
-					0,                // Bits
-					0,                // Free
-					0,                // Lvl
-					0,                // Kill
-					0, 0, 0, 0, 1, 2, // Right
+					0,                      // Bits
+					0,                      // Free
+					0,                      // Lvl
+					0,                      // Kill
+					0, 0, 0, 0, 0, 0, 1, 2, // Right
 				},
 			},
-			want: &[BtId]byte{0, 0, 0, 0, 1, 2},
+			want: &[BtId]byte{0, 0, 0, 0, 0, 0, 1, 2},
 		},
 	}
 	for _, tt := range tests {
@@ -148,17 +148,17 @@ func TestPageZero_SetAllocRight(t *testing.T) {
 					0, 0, 0, 0, // Act
 					0, 0, 0, 0, // Min
 					0, 0, 0, 0, // Garbase
-					0,                // Bits
-					0,                // Free
-					0,                // Lvl
-					0,                // Kill
-					0, 0, 0, 0, 1, 2, // Right
+					0,                      // Bits
+					0,                      // Free
+					0,                      // Lvl
+					0,                      // Kill
+					0, 0, 0, 0, 0, 0, 1, 2, // Right
 				},
 			},
 			args: args{
 				pageNo: 512,
 			},
-			want: []byte{0, 0, 0, 0, 2, 0},
+			want: []byte{0, 0, 0, 0, 0, 0, 2, 0},
 		},
 	}
 	for _, tt := range tests {
@@ -406,7 +406,7 @@ func TestBufMgr_NewPage(t *testing.T) {
 			name: "create a new page without reusing empty page",
 			args: args{
 				pageSet: PageSet{},
-				page:    Page{Data: []byte{1, 2, 3, 4, 5, 6}},
+				page:    Page{Data: []byte{1, 2, 3, 4, 5, 6, 7, 8}},
 				reads:   0,
 				writes:  0,
 			},
