@@ -23,7 +23,7 @@ func TestPage_SetKeyOffset(t *testing.T) {
 		{
 			name: "set offset to first slot",
 			fields: fields{
-				Data: []byte{0, 0, 0, 0, 0, 0},
+				Data: []byte{0, 0, 0, 0, 0, 0, 0, 0},
 			},
 			args: args{
 				slot:   1,
@@ -35,8 +35,8 @@ func TestPage_SetKeyOffset(t *testing.T) {
 			name: "set offset to second slot",
 			fields: fields{
 				Data: []byte{
-					0, 0, 0, 0, 0, 0, // first slot
-					0, 0, 0, 0, 0, 0, // second slot
+					0, 0, 0, 0, 0, 0, 0, 0, // first slot
+					0, 0, 0, 0, 0, 0, 0, 0, // second slot
 				},
 			},
 			args: args{
@@ -206,7 +206,7 @@ func TestPutID(t *testing.T) {
 				dest: [BtId]uint8{},
 				id:   2,
 			},
-			want: []byte{0, 0, 0, 0, 0, 2},
+			want: []byte{0, 0, 0, 0, 0, 0, 0, 2},
 		},
 	}
 	for _, tt := range tests {
@@ -231,7 +231,7 @@ func TestGetID(t *testing.T) {
 		{
 			name: "get id",
 			args: args{
-				src: &[BtId]uint8{0, 0, 0, 0, 1, 2},
+				src: &[BtId]uint8{0, 0, 0, 0, 0, 0, 1, 2},
 			},
 			want: 258,
 		},
@@ -247,15 +247,15 @@ func TestGetID(t *testing.T) {
 
 func TestPage_FindSlot(t *testing.T) {
 	data := []byte{
-		40, 0, 0, 0, 0, 0, // first slot
-		29, 0, 0, 0, 0, 0, // second slot
-		18, 0, 0, 0, 0, 0, // third slot
+		50, 0, 0, 0, 0, 0, 0, 0, // first slot
+		37, 0, 0, 0, 0, 0, 0, 0, // second slot
+		24, 0, 0, 0, 0, 0, 0, 0, // third slot
 		3, 2, 1, 0, // key 3(keyLen + keyValue)
-		6, 0, 0, 0, 0, 0, 0, // value 3(valueLen + value)
+		8, 0, 0, 0, 0, 0, 0, 0, 0, // value 3(valueLen + value)
 		3, 0, 1, 0, // key 2(keyLen + keyValue)
-		6, 0, 0, 0, 0, 0, 0, // value 2(valueLen + value)
+		8, 0, 0, 0, 0, 0, 0, 0, 0, // value 2(valueLen + value)
 		4, 0, 0, 1, 1, // key 1(keyLen + keyValue)
-		6, 0, 0, 0, 0, 0, 0, // value 1(valueLen + value)
+		8, 0, 0, 0, 0, 0, 0, 0, 0, // value 1(valueLen + value)
 	}
 	type args struct {
 		key []byte

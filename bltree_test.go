@@ -70,7 +70,7 @@ func TestBLTree_insert_and_find(t *testing.T) {
 		t.Errorf("FindKey() = %v, want %v", valLen, -1)
 	}
 
-	if err := bltree.InsertKey([]byte{1, 1, 1, 1}, 0, [BtId]byte{0, 0, 0, 0, 0, 1}, true); err != BLTErrOk {
+	if err := bltree.InsertKey([]byte{1, 1, 1, 1}, 0, [BtId]byte{0, 0, 0, 0, 0, 0, 0, 1}, true); err != BLTErrOk {
 		t.Errorf("InsertKey() = %v, want %v", err, BLTErrOk)
 	}
 
@@ -143,7 +143,7 @@ func TestBLTree_delete(t *testing.T) {
 
 	key := []byte{1, 1, 1, 1}
 
-	if err := bltree.InsertKey(key, 0, [BtId]byte{0, 0, 0, 0, 0, 1}, true); err != BLTErrOk {
+	if err := bltree.InsertKey(key, 0, [BtId]byte{0, 0, 0, 0, 0, 0, 0, 1}, true); err != BLTErrOk {
 		t.Errorf("InsertKey() = %v, want %v", err, BLTErrOk)
 	}
 
@@ -171,7 +171,7 @@ func TestBLTree_deleteMany(t *testing.T) {
 	}
 
 	for i := range keys {
-		if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 0, 0, 0, 0, 0}, true); err != BLTErrOk {
+		if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 0, 0, 0, 0, 0, 0, 0}, true); err != BLTErrOk {
 			t.Errorf("InsertKey() = %v, want %v", err, BLTErrOk)
 		}
 		if i%2 == 0 {
@@ -187,8 +187,8 @@ func TestBLTree_deleteMany(t *testing.T) {
 				t.Errorf("FindKey() = %v, want %v, key %v", found, -1, keys[i])
 			}
 		} else {
-			if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
-				t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
+			if found, _, _ := bltree.FindKey(keys[i], BtId); found != 8 {
+				t.Errorf("FindKey() = %v, want %v, key %v", found, 8, keys[i])
 			}
 		}
 	}
@@ -209,7 +209,7 @@ func TestBLTree_deleteAll(t *testing.T) {
 	}
 
 	for i := range keys {
-		if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 0, 0, 0, 0, 0}, true); err != BLTErrOk {
+		if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 0, 0, 0, 0, 0, 0, 0}, true); err != BLTErrOk {
 			t.Errorf("InsertKey() = %v, want %v", err, BLTErrOk)
 		}
 	}
@@ -265,9 +265,9 @@ func TestBLTree_deleteManyConcurrently(t *testing.T) {
 						panic("FindKey() != -1")
 					}
 				} else {
-					if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
-						t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
-						panic("FindKey() != 6")
+					if found, _, _ := bltree.FindKey(keys[i], BtId); found != 8 {
+						t.Errorf("FindKey() = %v, want %v, key %v", found, 8, keys[i])
+						panic("FindKey() != 8")
 					}
 				}
 			}
@@ -294,8 +294,8 @@ func TestBLTree_deleteManyConcurrently(t *testing.T) {
 						t.Errorf("FindKey() = %v, want %v, key %v", found, -1, keys[i])
 					}
 				} else {
-					if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
-						t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
+					if found, _, _ := bltree.FindKey(keys[i], BtId); found != 8 {
+						t.Errorf("FindKey() = %v, want %v, key %v", found, 8, keys[i])
 					}
 				}
 			}
