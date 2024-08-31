@@ -970,10 +970,28 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		key := curSet.page.Key(slot)
 		val := curSet.page.Value(slot)
 
+		isAboveLower := false
+		isBelowUpper := false
 		// if upperKey is nil, then this condition is always false
-		if bytes.Compare(key, upperKey) > 0 {
+		if upperKey != nil && bytes.Compare(key, upperKey) <= 0 {
+			isBelowUpper = true
+		}
+		if lowerKey != nil && bytes.Compare(key, lowerKey) >= 0 {
+			isAboveLower = true
+		}
+		if upperKey == nil {
+			isBelowUpper = true
+		}
+		if lowerKey == nil {
+			isAboveLower = true
+		}
+		if !isAboveLower || !isBelowUpper {
 			return false
 		}
+
+		//if bytes.Compare(key, upperKey)  0 {
+		//	return false
+		//}
 
 		retKeyArr = append(retKeyArr, key)
 		retValArr = append(retValArr, *val)
@@ -988,6 +1006,9 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 
 	readEntriesOfCurSet := func() bool {
 		for slot < curSet.page.Cnt {
+			if slot == 0 {
+				slot++
+			}
 			if curSet.page.Dead(slot) {
 				slot++
 				continue
@@ -1020,6 +1041,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		curSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
 		if curSet.latch != nil {
 			curSet.page = tree.mgr.GetRefOfPageAtPool(curSet.latch)
+			slot = 0
 		} else {
 			panic("PinLatch failed")
 		}

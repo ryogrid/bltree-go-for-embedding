@@ -233,6 +233,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		copy(ppage.DataAsSlice()[:PageHeaderSize], headerBytes)
 		copy(ppage.DataAsSlice()[PageHeaderSize:], page.Data)
 	}
+
 	mgr.pbm.UnpinPPage(ppageId, isDirty)
 
 	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "ppageId:", ppageId, "pin count: ", ppage.PPinCount())
