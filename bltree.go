@@ -963,17 +963,35 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	slot := tree.mgr.PageFetch(curSet, lowerKey, 0, LockRead, &tree.reads, &tree.writes)
 
 	getKV := func() bool {
-		slotType := curSet.page.Typ(slot)
-		if slotType != Unique {
-			return true
-		}
+		//slotType := curSet.page.Typ(slot)
+		//if slotType != Unique {
+		//	return true
+		//}
 		key := curSet.page.Key(slot)
 		val := curSet.page.Value(slot)
 
+		isAboveLower := false
+		isBelowUpper := false
 		// if upperKey is nil, then this condition is always false
-		if bytes.Compare(key, upperKey) > 0 {
+		if upperKey != nil && bytes.Compare(key, upperKey) <= 0 {
+			isBelowUpper = true
+		}
+		if lowerKey != nil && bytes.Compare(key, lowerKey) >= 0 {
+			isAboveLower = true
+		}
+		if upperKey == nil {
+			isBelowUpper = true
+		}
+		if lowerKey == nil {
+			isAboveLower = true
+		}
+		if !isAboveLower || !isBelowUpper {
 			return false
 		}
+
+		//if bytes.Compare(key, upperKey)  0 {
+		//	return false
+		//}
 
 		retKeyArr = append(retKeyArr, key)
 		retValArr = append(retValArr, *val)
@@ -982,13 +1000,22 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	}
 
 	freePinLatchs := func(latch *Latchs) {
+		//// page out on parent buffer manager is safe though other threads may be accessing the page
+		//// because BLTree doesn't access the parent page's memory directly
+		//latch.pin = 0
 		tree.mgr.PageUnlock(LockRead, latch)
 		tree.mgr.UnpinLatch(latch)
 	}
 
 	readEntriesOfCurSet := func() bool {
-		for slot < curSet.page.Cnt {
+		for slot <= curSet.page.Cnt {
+			if slot == 0 {
+				slot++
+			}
 			if curSet.page.Dead(slot) {
+				slot++
+				continue
+			} else if curSet.page.Typ(slot) == Librarian {
 				slot++
 				continue
 			} else {
@@ -1004,7 +1031,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	for {
 		right := GetID(&curSet.page.Right)
 
-		// the first page is tail or reached tail
+		// reached tail
 		if right == 0 {
 			readEntriesOfCurSet()
 			break
@@ -1020,12 +1047,13 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		curSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
 		if curSet.latch != nil {
 			curSet.page = tree.mgr.GetRefOfPageAtPool(curSet.latch)
+			slot = 0
 		} else {
 			panic("PinLatch failed")
 		}
 		tree.mgr.PageLock(LockRead, curSet.latch)
 
-		// free latch prev page
+		// free latch and unpin prev page
 		freePinLatchs(prevPageLatch)
 	}
 
