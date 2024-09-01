@@ -20,7 +20,7 @@ const (
 	BtMinPage = 1 << BtMinBits // minimum page size
 	BtMaxPage = 1 << BtMaxBits // maximum page size
 
-	BtId = 6 // Define the length of the page and key pointers
+	BtId = 8 //6 // Define the length of the page and key pointers
 
 	ClockBit = uint32(0x8000) // the bit in pool->pin
 

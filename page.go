@@ -28,8 +28,8 @@ const (
 	MaxKey   = 255
 	KeyArray = MaxKey + 1 // 1 is key length
 
-	PageHeaderSize = 26 // size of page header in bytes
-	SlotSize       = 6  // size of slot in bytes
+	PageHeaderSize = 28 //26 // size of page header in bytes
+	SlotSize       = 8  //6  // size of slot in bytes
 
 	PPageIdSize = 4
 	// constants for page ID mapping entries serialization
