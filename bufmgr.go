@@ -177,7 +177,7 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 // writePage writes a page to permanent location in BLTree file,
 // and clear the dirty bit (← clear していない...)
 func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
-	//fmt.Println("PageOut pageNo: ", pageNo)
+	fmt.Println("PageOut pageNo: ", pageNo)
 
 	ppageId := int32(-1)
 	isNoEntry := false
@@ -197,6 +197,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 
 		// create new page on parent's buffer pool and db file
 		// 1 pin count is left
+		fmt.Println("PageOut: new page... : ", pageNo)
 		ppage = mgr.pbm.NewPPage()
 		if ppage == nil {
 			panic("failed to create new page")

@@ -963,10 +963,10 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	slot := tree.mgr.PageFetch(curSet, lowerKey, 0, LockRead, &tree.reads, &tree.writes)
 
 	getKV := func() bool {
-		slotType := curSet.page.Typ(slot)
-		if slotType != Unique {
-			return true
-		}
+		//slotType := curSet.page.Typ(slot)
+		//if slotType != Unique {
+		//	return true
+		//}
 		key := curSet.page.Key(slot)
 		val := curSet.page.Value(slot)
 
@@ -1005,11 +1005,14 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	}
 
 	readEntriesOfCurSet := func() bool {
-		for slot < curSet.page.Cnt {
+		for slot <= curSet.page.Cnt {
 			if slot == 0 {
 				slot++
 			}
 			if curSet.page.Dead(slot) {
+				slot++
+				continue
+			} else if curSet.page.Typ(slot) == Librarian {
 				slot++
 				continue
 			} else {
@@ -1025,7 +1028,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	for {
 		right := GetID(&curSet.page.Right)
 
-		// the first page is tail or reached tail
+		// reached tail
 		if right == 0 {
 			readEntriesOfCurSet()
 			break
