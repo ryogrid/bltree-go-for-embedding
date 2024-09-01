@@ -1000,6 +1000,9 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	}
 
 	freePinLatchs := func(latch *Latchs) {
+		//// page out on parent buffer manager is safe though other threads may be accessing the page
+		//// because BLTree doesn't access the parent page's memory directly
+		//latch.pin = 0
 		tree.mgr.PageUnlock(LockRead, latch)
 		tree.mgr.UnpinLatch(latch)
 	}
@@ -1050,7 +1053,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		}
 		tree.mgr.PageLock(LockRead, curSet.latch)
 
-		// free latch prev page
+		// free latch and unpin prev page
 		freePinLatchs(prevPageLatch)
 	}
 
