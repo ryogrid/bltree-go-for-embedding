@@ -45,6 +45,7 @@ func (z *PageZero) AllocRight() *[BtId]byte {
 }
 
 func (z *PageZero) SetAllocRight(pageNo Uid) {
+	//fmt.Println("SetAllocRight pageNo: ", pageNo, "is used.")
 	PutID(z.AllocRight(), pageNo)
 }
 
@@ -177,7 +178,7 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 // writePage writes a page to permanent location in BLTree file,
 // and clear the dirty bit (← clear していない...)
 func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
-	fmt.Println("PageOut pageNo: ", pageNo)
+	//fmt.Println("PageOut pageNo: ", pageNo)
 
 	ppageId := int32(-1)
 	isNoEntry := false
@@ -197,7 +198,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 
 		// create new page on parent's buffer pool and db file
 		// 1 pin count is left
-		fmt.Println("PageOut: new page... : ", pageNo)
+		//fmt.Println("PageOut: new page... : ", pageNo)
 		ppage = mgr.pbm.NewPPage()
 		if ppage == nil {
 			panic("failed to create new page")
@@ -227,7 +228,8 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		}
 	}
 
-	if isDirty && !isNoEntry {
+	//if isDirty && !isNoEntry {
+	if isDirty {
 		headerBuf := bytes.NewBuffer(make([]byte, 0, PageHeaderSize))
 		binary.Write(headerBuf, binary.LittleEndian, page.PageHeader)
 		headerBytes := headerBuf.Bytes()
@@ -235,6 +237,12 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		copy(ppage.DataAsSlice()[PageHeaderSize:], page.Data)
 	}
 
+	if ppage.PPinCount() != 1 {
+		cnt := ppage.PPinCount()
+		for ii := 0; ii < int(cnt-1); ii++ {
+			ppage.DecPPinCount()
+		}
+	}
 	mgr.pbm.UnpinPPage(ppageId, isDirty)
 
 	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "ppageId:", ppageId, "pin count: ", ppage.PPinCount())
@@ -810,6 +818,7 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 // return page to free list
 // page must be delete and write locked
 func (mgr *BufMgr) PageFree(set *PageSet) {
+	fmt.Println("PageFree pageNo: ", set.latch.pageNo)
 
 	// lock allocation page
 	mgr.lock.SpinWriteLock()
@@ -819,6 +828,13 @@ func (mgr *BufMgr) PageFree(set *PageSet) {
 	PutID(&mgr.pageZero.chain, set.latch.pageNo)
 	set.latch.dirty = true
 	set.page.Free = true
+	if val, ok := mgr.pageIdConvMap.Load(set.latch.pageNo); ok {
+		ppId := val.(int32)
+		mgr.pbm.DeallocatePPage(ppId, true)
+		mgr.pageIdConvMap.Delete(set.latch.pageNo)
+	} else {
+		// do nothing
+	}
 
 	// unlock the released page
 	mgr.PageUnlock(LockDelete, set.latch)
