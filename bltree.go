@@ -1042,7 +1042,10 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 			break
 		}
 
-		prevPageLatch := curSet.latch
+		//prevPageLatch := curSet.latch
+
+		// free lock and unpin
+		freePinLatchs(curSet.latch)
 
 		curSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
 		if curSet.latch != nil {
@@ -1053,8 +1056,6 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		}
 		tree.mgr.PageLock(LockRead, curSet.latch)
 
-		// free latch and unpin prev page
-		freePinLatchs(prevPageLatch)
 	}
 
 	// free the last page latch
