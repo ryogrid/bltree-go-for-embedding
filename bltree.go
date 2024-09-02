@@ -972,6 +972,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 
 		isAboveLower := false
 		isBelowUpper := false
+		isReachedStopper := false
 		// if upperKey is nil, then this condition is always false
 		if upperKey != nil && bytes.Compare(key, upperKey) <= 0 {
 			isBelowUpper = true
@@ -985,7 +986,10 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		if lowerKey == nil {
 			isAboveLower = true
 		}
-		if !isAboveLower || !isBelowUpper {
+		if key != nil && len(key) == 2 && key[0] == 0xff && key[1] == 0xff {
+			isReachedStopper = true
+		}
+		if !isAboveLower || !isBelowUpper || isReachedStopper {
 			return false
 		}
 
@@ -1015,7 +1019,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 			if curSet.page.Dead(slot) {
 				slot++
 				continue
-			} else if curSet.page.Typ(slot) == Librarian {
+			} else if curSet.page.Typ(slot) != Unique {
 				slot++
 				continue
 			} else {
@@ -1042,7 +1046,10 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 			break
 		}
 
-		prevPageLatch := curSet.latch
+		//prevPageLatch := curSet.latch
+
+		// free lock and unpin
+		freePinLatchs(curSet.latch)
 
 		curSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
 		if curSet.latch != nil {
@@ -1053,8 +1060,6 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		}
 		tree.mgr.PageLock(LockRead, curSet.latch)
 
-		// free latch and unpin prev page
-		freePinLatchs(prevPageLatch)
 	}
 
 	// free the last page latch

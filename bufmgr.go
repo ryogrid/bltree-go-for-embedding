@@ -33,7 +33,7 @@ type (
 		latchs        []Latchs    // mapped latch set from buffer pool
 		pagePool      []Page      // mapped to the buffer pool pages
 		pbm           interfaces.ParentBufMgr
-		pageIdConvMap *sync.Map // page id conversion map: Uid -> types.PageID
+		pageIdConvMap sync.Map // page id conversion map: Uid -> types.PageID
 
 		err BLTErr // last error
 	}
@@ -45,7 +45,7 @@ func (z *PageZero) AllocRight() *[BtId]byte {
 }
 
 func (z *PageZero) SetAllocRight(pageNo Uid) {
-	//fmt.Println("SetAllocRight pageNo: ", pageNo, "is used.")
+	//fmt.Println("SetAllocRight pageNo: ", (pageNo - 1), "is used.")
 	PutID(z.AllocRight(), pageNo)
 }
 
@@ -68,7 +68,7 @@ func NewBufMgr(bits uint8, nodeMax uint, pbm interfaces.ParentBufMgr, lastPageZe
 	mgr := BufMgr{}
 
 	mgr.pbm = pbm
-	mgr.pageIdConvMap = new(sync.Map)
+	mgr.pageIdConvMap = sync.Map{}
 
 	mgr.pageSize = 1 << bits
 	mgr.pageBits = bits
@@ -228,8 +228,7 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		}
 	}
 
-	//if isDirty && !isNoEntry {
-	if isDirty {
+	if isDirty && !isNoEntry {
 		headerBuf := bytes.NewBuffer(make([]byte, 0, PageHeaderSize))
 		binary.Write(headerBuf, binary.LittleEndian, page.PageHeader)
 		headerBytes := headerBuf.Bytes()
@@ -237,12 +236,6 @@ func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 		copy(ppage.DataAsSlice()[PageHeaderSize:], page.Data)
 	}
 
-	if ppage.PPinCount() != 1 {
-		cnt := ppage.PPinCount()
-		for ii := 0; ii < int(cnt-1); ii++ {
-			ppage.DecPPinCount()
-		}
-	}
 	mgr.pbm.UnpinPPage(ppageId, isDirty)
 
 	//fmt.Println("PageOut: unpin paged. pageNo:", pageNo, "ppageId:", ppageId, "pin count: ", ppage.PPinCount())
@@ -650,7 +643,11 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 	// use empty chain first, else allocate empty page
 	pageNo := GetID(&mgr.pageZero.chain)
 	if pageNo > 0 {
-		//fmt.Println("NewPPage(2):  pageNo: ", pageNo)
+		// register new page to parent buffer pool if needed
+		if _, ok := mgr.pageIdConvMap.Load(pageNo); !ok {
+			mgr.PageOut(contents, pageNo, true)
+		}
+
 		set.latch = mgr.PinLatch(pageNo, true, reads, writes)
 		if set.latch != nil {
 			set.page = mgr.GetRefOfPageAtPool(set.latch)
@@ -660,6 +657,7 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 		}
 
 		PutID(&mgr.pageZero.chain, GetID(&set.page.Right))
+
 		mgr.lock.SpinReleaseWrite()
 		MemCpyPage(set.page, contents)
 
@@ -670,6 +668,13 @@ func (mgr *BufMgr) NewPage(set *PageSet, contents *Page, reads *uint, writes *ui
 
 	pageNo = GetID(mgr.pageZero.AllocRight())
 	mgr.pageZero.SetAllocRight(pageNo + 1)
+
+	//fmt.Println("NewPPage(2):  pageNo: ", pageNo)
+
+	// register new page to parent buffer pool if needed
+	if _, ok := mgr.pageIdConvMap.Load(pageNo); !ok {
+		mgr.PageOut(contents, pageNo, true)
+	}
 
 	// unlock allocation latch
 	mgr.lock.SpinReleaseWrite()
@@ -828,10 +833,11 @@ func (mgr *BufMgr) PageFree(set *PageSet) {
 	PutID(&mgr.pageZero.chain, set.latch.pageNo)
 	set.latch.dirty = true
 	set.page.Free = true
-	if val, ok := mgr.pageIdConvMap.Load(set.latch.pageNo); ok {
-		ppId := val.(int32)
-		mgr.pbm.DeallocatePPage(ppId, true)
-		mgr.pageIdConvMap.Delete(set.latch.pageNo)
+	if _, ok := mgr.pageIdConvMap.Load(set.latch.pageNo); ok {
+		mgr.PageOut(set.page, set.latch.pageNo, false)
+		//ppId := val.(int32)
+		//mgr.pbm.DeallocatePPage(ppId, true)
+		//mgr.pageIdConvMap.Delete(set.latch.pageNo)
 	} else {
 		// do nothing
 	}
@@ -891,5 +897,5 @@ func (mgr *BufMgr) GetMappedPPageIdOfPageZero() int32 {
 }
 
 func (mgr *BufMgr) GetPageIdConvMap() *sync.Map {
-	return mgr.pageIdConvMap
+	return &mgr.pageIdConvMap
 }
