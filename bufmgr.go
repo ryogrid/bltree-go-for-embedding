@@ -167,7 +167,9 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 		}
 		headerBuf := bytes.NewBuffer(ppage.DataAsSlice()[:PageHeaderSize])
 		binary.Read(headerBuf, binary.LittleEndian, &page.PageHeader)
-		page.Data = (ppage.DataAsSlice())[PageHeaderSize:]
+		//page.Data = (ppage.DataAsSlice())[PageHeaderSize:]
+		page.Data = make([]byte, mgr.pageDataSize)
+		copy(page.Data, (ppage.DataAsSlice())[PageHeaderSize:])
 	} else {
 		panic("page mapping not found")
 	}
