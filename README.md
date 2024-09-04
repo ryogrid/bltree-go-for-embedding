@@ -5,7 +5,7 @@
 - This fork is customized for embedding in other projects
 
 # Customized Point
-- (added a method for range scan)
+- (adding of a method for range scan)
 - blink-tree-go has own buffer manager
 - But if you want to use blink-tree-go on your DBMS project, you should want to use your buffer manager for memory management
 - For realization of memory management with your buffer manager, bltree-go-for-embedding integrates buffer manager of blink-tree-go and one of yours
