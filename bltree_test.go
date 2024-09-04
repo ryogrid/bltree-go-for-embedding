@@ -224,6 +224,64 @@ func TestBLTree_deleteAll(t *testing.T) {
 	}
 }
 
+func TestBLTree_deleteManyConcurrently2(t *testing.T) {
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*20*2, pbm, nil)
+
+	//keyTotal := 160000000
+	keyTotal := 1600000
+	routineNum := 20
+
+	keys := make([][]byte, keyTotal)
+	for i := 0; i < keyTotal; i++ {
+		bs := make([]byte, 8)
+		binary.LittleEndian.PutUint64(bs, uint64(i))
+		bs = append(bs, bs...)
+		bs = append(bs, bs...)
+		keys[i] = bs
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(routineNum)
+
+	start := time.Now()
+	for r := 0; r < routineNum; r++ {
+		go func(n int) {
+			bltree := NewBLTree(mgr)
+			for i := 0; i < keyTotal; i++ {
+				if i%routineNum != n {
+					continue
+				}
+				if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 1, 2, 3, 4, 5}, true); err != BLTErrOk {
+					t.Errorf("in goroutine%d InsertKey() = %v, want %v", n, err, BLTErrOk)
+				}
+
+				if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
+					t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
+					panic("FindKey() != 6")
+				}
+			}
+
+			for i := 0; i < keyTotal; i++ {
+				if i%routineNum != n {
+					continue
+				}
+
+				if err := bltree.DeleteKey(keys[i], 0); err != BLTErrOk {
+					t.Errorf("DeleteKey() = %v, want %v", err, BLTErrOk)
+				}
+
+				if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 1, 2, 3, 4, 5}, true); err != BLTErrOk {
+					t.Errorf("in goroutine%d InsertKey() = %v, want %v", n, err, BLTErrOk)
+				}
+			}
+			wg.Done()
+		}(r)
+	}
+	wg.Wait()
+	t.Logf("insert %d keys and delete skip one concurrently. duration =  %v", keyTotal, time.Since(start))
+}
+
 func TestBLTree_deleteManyConcurrently(t *testing.T) {
 	pbm := NewParentBufMgrDummy(nil)
 	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*7*2, pbm, nil)
