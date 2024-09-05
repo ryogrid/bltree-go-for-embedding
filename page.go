@@ -235,5 +235,6 @@ func KeyCmp(a, b []byte) int {
 
 func MemCpyPage(dest, src *Page) {
 	dest.PageHeader = src.PageHeader
+	//copy(dest.PageHeader.Right[:], src.PageHeader.Right[:])
 	copy(dest.Data, src.Data)
 }

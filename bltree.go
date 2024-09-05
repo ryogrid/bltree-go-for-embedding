@@ -424,17 +424,24 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	//	return slot
 	//}
 
-	cond1 := false
-	cond2 := false
-	if page.Min > (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
-		cond1 = true
-	}
-	if page.Min > slot*SlotSize {
-		cond2 = true
-	}
-	if cond1 && cond2 {
+	/*
+		cond1 := false
+		cond2 := false
+		//if page.Min > (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		if page.Min < (max+2)*SlotSize {
+			cond1 = true
+		}
+		//if page.Min > slot*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		if page.Min < slot*SlotSize {
+			cond2 = true
+		}
+	*/
+	//if !cond1 && !cond2 {
+	if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
+		fmt.Println("cleanPage return slot. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
 		return slot
 	} else {
+		fmt.Println("cleanPage return 0. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
 		return 0
 	}
 
@@ -643,9 +650,9 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 			frame.Act++
 		}
 
-		if (idx+1)*6+frame.Act*40 > tree.mgr.pageDataSize {
-			fmt.Println("splitPage: need check!")
-		}
+		//if (idx+1)*6+frame.Act*40 > tree.mgr.pageDataSize {
+		//	fmt.Println("splitPage: need check!")
+		//}
 	}
 
 	frame.Bits = tree.mgr.pageBits
@@ -706,14 +713,16 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		set.page.SetTyp(idx, frame.Typ(cnt))
 		set.page.Act++
 
-		if (idx+1)*6+set.page.Act*40 > tree.mgr.pageDataSize {
-			fmt.Println("splitPage: need check!")
-		}
+		//if (idx+1)*6+set.page.Act*40 > tree.mgr.pageDataSize {
+		//	fmt.Println("splitPage: need check!")
+		//}
 	}
 
 	PutID(&set.page.Right, right.latch.pageNo)
 	set.page.Min = nxt
 	set.page.Cnt = idx
+
+	fmt.Println("splitPage: Min", set.page.Min, " Cnt:", set.page.Cnt)
 
 	return right.latch.entry
 }
@@ -789,8 +798,8 @@ func (tree *BLTree) insertSlot(
 		}
 	}
 
-	if slot*8 > set.page.Min {
-		fmt.Println("insertSlot: over Min!")
+	if set.page.Min < slot*SlotSize+uint32(len(key))+1+uint32(len(value))+1 {
+		fmt.Println("insertSlot: over Min! pageNo:", set.latch.pageNo, " slot:", slot, " Min:", set.page.Min, " Cnt:", set.page.Cnt)
 	}
 	// copy value onto page
 	set.page.Min -= uint32(len(value)) + 1
