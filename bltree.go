@@ -2,6 +2,7 @@ package blink_tree
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"sync/atomic"
 )
@@ -419,8 +420,22 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	page := set.page
 	max := page.Cnt
 
-	if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+	//if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+	//	return slot
+	//}
+
+	cond1 := false
+	cond2 := false
+	if page.Min > (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		cond1 = true
+	}
+	if page.Min > slot*SlotSize {
+		cond2 = true
+	}
+	if cond1 && cond2 {
 		return slot
+	} else {
+		return 0
 	}
 
 	// skip cleanup and proceed to split
@@ -445,15 +460,21 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	idx := uint32(0)
 	for cnt := uint32(0); cnt < max; {
 		cnt++
-
-		if cnt == slot {
-			if idx == 0 {
-				// because librarian slot will not be added
-				newSlot = 1
-			} else {
-				newSlot = idx + 2
-			}
+		//if cnt == slot {
+		//	if idx == 0 {
+		//		// because librarian slot will not be added
+		//		newSlot = 1
+		//	} else {
+		//		newSlot = idx + 2
+		//	}
+		//}
+		if idx == 0 {
+			// because librarian slot will not be added
+			newSlot = 1
+		} else {
+			newSlot = idx + 2
 		}
+
 		if cnt < max && frame.Dead(cnt) {
 			continue
 		}
@@ -482,7 +503,7 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 		page.SetTyp(idx, frame.Typ(cnt))
 
 		if nxt < idx*SlotSize {
-			log.Printf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, slot, frame.PageHeader, frame.Data)
+			log.Printf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data)
 		}
 
 		page.SetDead(idx, frame.Dead(cnt))
@@ -497,7 +518,20 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	// see if page has enough space now, or does it need splitting?
 	if page.Min >= (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
 		return newSlot
+	} else {
+		return 0
 	}
+	//cond1 = false
+	//cond2 = false
+	//if page.Min > (page.Cnt+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+	//	cond1 = true
+	//}
+	//if page.Min > newSlot*SlotSize {
+	//	cond2 = true
+	//}
+	//if cond1 && cond2 {
+	//	return newSlot
+	//}
 
 	return 0
 }
@@ -550,6 +584,9 @@ func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 	root.page.Act = 2
 	root.page.Lvl++
 
+	if root.page.Min < root.page.Cnt*SlotSize {
+		fmt.Println("splitRoot: need check!")
+	}
 	// release and unpin root pages
 	tree.mgr.PageUnlock(LockWrite, root.latch)
 	tree.mgr.UnpinLatch(root.latch)
@@ -604,6 +641,10 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		frame.SetDead(idx, set.page.Dead(cnt))
 		if !frame.Dead(idx) {
 			frame.Act++
+		}
+
+		if (idx+1)*6+frame.Act*40 > tree.mgr.pageDataSize {
+			fmt.Println("splitPage: need check!")
 		}
 	}
 
@@ -664,6 +705,10 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		set.page.SetKeyOffset(idx, nxt)
 		set.page.SetTyp(idx, frame.Typ(cnt))
 		set.page.Act++
+
+		if (idx+1)*6+set.page.Act*40 > tree.mgr.pageDataSize {
+			fmt.Println("splitPage: need check!")
+		}
 	}
 
 	PutID(&set.page.Right, right.latch.pageNo)
@@ -729,6 +774,14 @@ func (tree *BLTree) insertSlot(
 	typ SlotType,
 	release bool,
 ) BLTErr {
+	//if set.latch.pageNo == 14233 && slot >= 101 {
+	//	fmt.Println("insertSlot: need check!")
+	//}
+
+	//if set.page.Act*40+set.page.Cnt*8+8+40 > tree.mgr.pageDataSize {
+	//	fmt.Println("insertSlot: need check!")
+	//}
+
 	// if found slot > desired slot and previous slot is a librarian slot, use it
 	if slot > 1 {
 		if set.page.Typ(slot-1) == Librarian {
@@ -736,6 +789,9 @@ func (tree *BLTree) insertSlot(
 		}
 	}
 
+	if slot*8 > set.page.Min {
+		fmt.Println("insertSlot: over Min!")
+	}
 	// copy value onto page
 	set.page.Min -= uint32(len(value)) + 1
 	copy(set.page.Data[set.page.Min:], append([]byte{byte(len(value))}, value[:]...))
@@ -784,6 +840,10 @@ func (tree *BLTree) insertSlot(
 	set.page.SetKeyOffset(slot, set.page.Min)
 	set.page.SetTyp(slot, typ)
 	set.page.SetDead(slot, false)
+
+	//if set.latch.pageNo == 14233 && (slot == 101) {
+	//	fmt.Println("insertSlot: need check!")
+	//}
 
 	if release {
 		tree.mgr.PageUnlock(LockWrite, set.latch)
