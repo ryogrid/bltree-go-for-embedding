@@ -795,9 +795,14 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 		if slot > 0 {
 			if drill == lvl {
 				//if set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3 > mgr.pageDataSize {
-				//	fmt.Println("PageFetch: (set.page.Cnt+1)*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "slot:", slot)
+				//	 fmt.Println("PageFetch: set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "slot:", slot)
 				//	panic("page is broken")
 				//}
+				if slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3 > mgr.pageDataSize {
+
+					fmt.Println("PageFetch: slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "lvl:", lvl, "slot:", slot)
+					panic("page is broken")
+				}
 				return slot
 			}
 
