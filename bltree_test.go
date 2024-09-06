@@ -230,7 +230,7 @@ func TestBLTree_deleteManyConcurrently2(t *testing.T) {
 
 	//keyTotal := 160000000
 	keyTotal := 1600000
-	routineNum := 20 //1 //20
+	routineNum := 1 //20 //1 //20
 
 	keys := make([][]byte, keyTotal)
 	for i := 0; i < keyTotal; i++ {

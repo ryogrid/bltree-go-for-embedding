@@ -284,6 +284,9 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 
 				idx = set.page.Cnt - 1
 			}
+			if !ValidatePage(set.page) {
+				panic("DeleteKey: page broken!")
+			}
 		}
 	}
 
@@ -419,6 +422,10 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	page := set.page
 	max := page.Cnt
 
+	if !ValidatePage(page) {
+		panic("cleanPage: page broken!")
+	}
+
 	//if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
 	//	return slot
 	//}
@@ -437,7 +444,7 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	*/
 	//if !cond1 && !cond2 {
 	if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 && page.Min > (max+2)*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
-		fmt.Println("cleanPage return slot. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
+		//fmt.Println("cleanPage return slot. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
 		return slot
 	}
 	//else {
@@ -592,9 +599,14 @@ func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 	root.page.Act = 2
 	root.page.Lvl++
 
-	if root.page.Min < root.page.Cnt*SlotSize {
-		fmt.Println("splitRoot: need check!")
+	//if root.page.Min < root.page.Cnt*SlotSize {
+	//	fmt.Println("splitRoot: need check!")
+	//}
+
+	if !ValidatePage(root.page) {
+		panic("splitRoot: page broken!")
 	}
+
 	// release and unpin root pages
 	tree.mgr.PageUnlock(LockWrite, root.latch)
 	tree.mgr.UnpinLatch(root.latch)
@@ -650,17 +662,20 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		if !frame.Dead(idx) {
 			frame.Act++
 		}
-
-		if (idx+1)*6+(frame.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
-			//fmt.Println("splitPage: need check!")
-			panic("splitPage: page broken!")
-		}
 	}
 
 	frame.Bits = tree.mgr.pageBits
 	frame.Min = nxt
 	frame.Cnt = idx
 	frame.Lvl = lvl
+
+	//if (idx+1)*6+(frame.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+	//	//fmt.Println("splitPage: need check!")
+	//	panic("splitPage: page broken!")
+	//}
+	if !ValidatePage(frame) {
+		panic("splitPage: page broken!")
+	}
 
 	// link right node
 	if set.latch.pageNo > RootPage {
@@ -714,22 +729,26 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		set.page.SetKeyOffset(idx, nxt)
 		set.page.SetTyp(idx, frame.Typ(cnt))
 		set.page.Act++
-
-		if (idx+1)*6+(set.page.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
-			//fmt.Println("splitPage: need check!")
-			panic("splitPage: page broken!")
-		}
 	}
 
 	PutID(&set.page.Right, right.latch.pageNo)
 	set.page.Min = nxt
 	set.page.Cnt = idx
 
+	//if (idx+1)*6+(set.page.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+	//	//fmt.Println("splitPage: need check!")
+	//	panic("splitPage: page broken!")
+	//}
+
+	if !ValidatePage(set.page) {
+		panic("splitPage: page broken!")
+	}
+
 	if set.page.Cnt == 0 {
 		fmt.Println("splitPage: Cnt == 0!")
 	}
 
-	fmt.Println("splitPage: Min", set.page.Min, " Cnt:", set.page.Cnt, " Act:", set.page.Act, ", pageNo:", set.latch.pageNo)
+	//fmt.Println("splitPage: Min", set.page.Min, " Cnt:", set.page.Cnt, " Act:", set.page.Act, ", pageNo:", set.latch.pageNo)
 
 	return right.latch.entry
 }
@@ -798,6 +817,11 @@ func (tree *BLTree) insertSlot(
 	//	fmt.Println("insertSlot: need check!")
 	//}
 
+	//if set.page.Min < slot*SlotSize+uint32(len(key))+1+uint32(len(value))+1 {
+	//	fmt.Println("insertSlot: over Min! pageNo:", set.latch.pageNo, " slot:", slot, " Min:", set.page.Min, " Cnt:", set.page.Cnt)
+	//	panic("insertSlot: page broken")
+	//}
+
 	// if found slot > desired slot and previous slot is a librarian slot, use it
 	if slot > 1 {
 		if set.page.Typ(slot-1) == Librarian {
@@ -805,10 +829,6 @@ func (tree *BLTree) insertSlot(
 		}
 	}
 
-	if set.page.Min < slot*SlotSize+uint32(len(key))+1+uint32(len(value))+1 {
-		fmt.Println("insertSlot: over Min! pageNo:", set.latch.pageNo, " slot:", slot, " Min:", set.page.Min, " Cnt:", set.page.Cnt)
-		panic("insertSlot: page broken")
-	}
 	// copy value onto page
 	set.page.Min -= uint32(len(value)) + 1
 	copy(set.page.Data[set.page.Min:], append([]byte{byte(len(value))}, value[:]...))
@@ -861,6 +881,10 @@ func (tree *BLTree) insertSlot(
 	//if set.latch.pageNo == 14233 && (slot == 101) {
 	//	fmt.Println("insertSlot: need check!")
 	//}
+
+	if !ValidatePage(set.page) {
+		panic("insertSlot: page broken")
+	}
 
 	if release {
 		tree.mgr.PageUnlock(LockWrite, set.latch)
@@ -1152,4 +1176,47 @@ func (tree *BLTree) GetRangeItr(lowerKey []byte, upperKey []byte) *BLTreeItr {
 		curIdx: 0,
 		elems:  uint32(elems),
 	}
+}
+
+// for debugging
+// key length is fixed size with global constant
+func ValidatePage(page *Page) bool {
+	actKeys := uint32(0)
+	for slot := uint32(1); slot <= page.Cnt; slot++ {
+		switch page.Typ(slot) {
+		case Unique:
+			key := page.Key(slot)
+			if len(key) != KeySizeForDebug && len(key) != 2 {
+				panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
+			}
+			val := page.Value(slot)
+			if len(*val) != BtId && len(*val) != 0 {
+				panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
+			}
+			if len(*val) != 0 || len(key) == 2 {
+				actKeys++
+			}
+		case Librarian:
+			if !page.Dead(slot) {
+				panic("ValidatePage: Librarian slot is not dead!")
+			}
+			offset := page.KeyOffset(slot)
+			if offset == 0 {
+				panic("ValidatePage: Librarian slot key offset is not zero!")
+			}
+			if offset > 32767 {
+				panic("ValidatePage: Librarian slot key offset is too large!")
+			}
+		default:
+			// stopper key
+			if len(page.Key(slot)) != 2 {
+				panic("ValidatePage: Stopper key length is not correct!")
+			}
+			actKeys++
+		}
+	}
+	if actKeys != page.Act {
+		panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
+	}
+	return true
 }

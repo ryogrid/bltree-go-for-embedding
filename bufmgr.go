@@ -174,6 +174,10 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 		panic("page mapping not found")
 	}
 
+	if !ValidatePage(page) {
+		panic("PageIn: page is broken")
+	}
+
 	return BLTErrOk
 }
 
@@ -181,6 +185,10 @@ func (mgr *BufMgr) PageIn(page *Page, pageNo Uid) BLTErr {
 // and clear the dirty bit (← clear していない...)
 func (mgr *BufMgr) PageOut(page *Page, pageNo Uid, isDirty bool) BLTErr {
 	//fmt.Println("PageOut pageNo: ", pageNo)
+
+	if !ValidatePage(page) {
+		panic("PageOut: page is broken")
+	}
 
 	ppageId := int32(-1)
 	isNoEntry := false
@@ -794,14 +802,12 @@ func (mgr *BufMgr) PageFetch(set *PageSet, key []byte, lvl uint8, lock BLTLockMo
 		slot = set.page.FindSlot(key)
 		if slot > 0 {
 			if drill == lvl {
-				//if set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3 > mgr.pageDataSize {
-				//	 fmt.Println("PageFetch: set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", set.page.Cnt*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "slot:", slot)
+				//if slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3 > mgr.pageDataSize {
+				//	fmt.Println("PageFetch: slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "lvl:", lvl, "slot:", slot)
 				//	panic("page is broken")
 				//}
-				if slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3 > mgr.pageDataSize {
-
-					fmt.Println("PageFetch: slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3:", slot*SlotSize+(set.page.Act-1)*EntrySizeForDebug+3, " mgr.pageDataSize:", mgr.pageDataSize, "pageNo:", set.latch.pageNo, "Cnt:", set.page.Cnt, "Act:", set.page.Act, "lvl:", lvl, "slot:", slot)
-					panic("page is broken")
+				if !ValidatePage(set.page) {
+					panic("PageFetch: page is broken")
 				}
 				return slot
 			}
