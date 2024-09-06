@@ -31,6 +31,8 @@ const (
 	PageHeaderSize = 26 // size of page header in bytes
 	SlotSize       = 6  // size of slot in bytes
 
+	EntrySizeForDebug = 20
+
 	PPageIdSize = 4
 	// constants for page ID mapping entries serialization
 	// and free page ID list serialization
