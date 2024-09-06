@@ -1193,7 +1193,11 @@ func ValidatePage(page *Page) bool {
 			if len(*val) != BtId && len(*val) != 0 {
 				panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
 			}
-			if len(*val) != 0 || len(key) == 2 {
+			isDead := false
+			if page.Dead(slot) {
+				isDead = true
+			}
+			if (len(*val) != 0 || len(key) == 2) && !isDead {
 				actKeys++
 			}
 		case Librarian:
