@@ -651,10 +651,10 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 			frame.Act++
 		}
 
-		if (idx+1)*6+(frame.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
-			//fmt.Println("splitPage: need check!")
-			panic("splitPage: page broken!")
-		}
+		//if (idx+1)*6+(frame.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+		//	//fmt.Println("splitPage: need check!")
+		//	panic("splitPage: page broken!")
+		//}
 	}
 
 	frame.Bits = tree.mgr.pageBits
@@ -715,10 +715,10 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		set.page.SetTyp(idx, frame.Typ(cnt))
 		set.page.Act++
 
-		if (idx+1)*6+(set.page.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
-			//fmt.Println("splitPage: need check!")
-			panic("splitPage: page broken!")
-		}
+		//if (idx+1)*6+(set.page.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+		//	//fmt.Println("splitPage: need check!")
+		//	panic("splitPage: page broken!")
+		//}
 	}
 
 	PutID(&set.page.Right, right.latch.pageNo)
