@@ -437,7 +437,7 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 		}
 	*/
 	//if !cond1 && !cond2 {
-	if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
+	if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 && page.Min > (max+2)*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
 		fmt.Println("cleanPage return slot. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
 		return slot
 	} else {
