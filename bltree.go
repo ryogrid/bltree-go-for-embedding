@@ -454,8 +454,14 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 
 	// skip cleanup and proceed to split
 	// if there's not enough garbage to bother with.
-	afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
 
+	dataSpaceAfterClean := (tree.mgr.pageDataSize - page.Min) + page.Garbage
+	if dataSpaceAfterClean+(page.Act*2+1)*SlotSize > tree.mgr.pageDataSize {
+		// in this case, after cleanup, header space and data space overlaps and it's an illegal state of page
+		return 0
+	}
+
+	afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
 	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
 		return 0
 	}
@@ -1221,6 +1227,9 @@ func ValidatePage(page *Page) bool {
 	}
 	if actKeys != page.Act {
 		panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
+	}
+	if page.Min < page.Cnt*SlotSize {
+		panic("ValidatePage: Min is not correct!")
 	}
 	return true
 }
