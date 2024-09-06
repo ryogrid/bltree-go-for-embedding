@@ -445,13 +445,13 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	//	return 0
 	//}
 
-	//// skip cleanup and proceed to split
-	//// if there's not enough garbage to bother with.
-	//afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
-	//
-	//if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
-	//	return 0
-	//}
+	// skip cleanup and proceed to split
+	// if there's not enough garbage to bother with.
+	afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
+
+	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
+		return 0
+	}
 
 	frame := NewPage(tree.mgr.pageDataSize)
 	MemCpyPage(frame, page)
@@ -467,20 +467,20 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	idx := uint32(0)
 	for cnt := uint32(0); cnt < max; {
 		cnt++
-		//if cnt == slot {
-		//	if idx == 0 {
-		//		// because librarian slot will not be added
-		//		newSlot = 1
-		//	} else {
-		//		newSlot = idx + 2
-		//	}
-		//}
-		if idx == 0 {
-			// because librarian slot will not be added
-			newSlot = 1
-		} else {
-			newSlot = idx + 2
+		if cnt == slot {
+			if idx == 0 {
+				// because librarian slot will not be added
+				newSlot = 1
+			} else {
+				newSlot = idx + 2
+			}
 		}
+		//if idx == 0 {
+		//	// because librarian slot will not be added
+		//	newSlot = 1
+		//} else {
+		//	newSlot = idx + 2
+		//}
 
 		if cnt < max && frame.Dead(cnt) {
 			continue
@@ -509,9 +509,9 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 		page.SetKeyOffset(idx, nxt)
 		page.SetTyp(idx, frame.Typ(cnt))
 
-		if nxt < idx*SlotSize {
+		if nxt <= idx*SlotSize {
 			//log.Printf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data)
-			panic(fmt.Sprintf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data))
+			panic(fmt.Sprintf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, cnt: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, set.page.Cnt, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data))
 		}
 
 		page.SetDead(idx, frame.Dead(cnt))
