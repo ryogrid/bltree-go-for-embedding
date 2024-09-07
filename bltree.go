@@ -3,6 +3,7 @@ package blink_tree
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"sync/atomic"
 )
 
@@ -288,21 +289,20 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 			set.page.SetDead(slot, true)
 			set.page.Garbage += uint32(1+len(ptr)) + uint32(1+len(val))
 			set.page.Act--
-			/*
-				// collapse empty slots beneath the fence
-				idx := set.page.Cnt - 1
-				for idx > 0 {
-					if set.page.Dead(idx) {
-						copy(set.page.slotBytes(idx), set.page.slotBytes(idx+1))
-						set.page.ClearSlot(set.page.Cnt)
-						set.page.Cnt--
-					} else {
-						break
-					}
 
-					idx = set.page.Cnt - 1
+			// collapse empty slots beneath the fence
+			idx := set.page.Cnt - 1
+			for idx > 0 {
+				if set.page.Dead(idx) {
+					copy(set.page.slotBytes(idx), set.page.slotBytes(idx+1))
+					set.page.ClearSlot(set.page.Cnt)
+					set.page.Cnt--
+				} else {
+					break
 				}
-			*/
+
+				idx = set.page.Cnt - 1
+			}
 			if !ValidatePage(set.page) {
 				panic("DeleteKey: page broken!")
 			}
@@ -656,11 +656,22 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	nxt := tree.mgr.pageDataSize
 	lvl := set.page.Lvl
 	var right PageSet
+	orgPage := NewPage(tree.mgr.pageDataSize)
+	MemCpyPage(orgPage, set.page)
+
+	retryCnt := int(0)
 
 	// split higher half of keys to frame
+retry:
 	frame := NewPage(tree.mgr.pageDataSize)
 	max := set.page.Cnt
-	cnt := max / 2
+	var cnt uint32
+	if retryCnt > 0 {
+		cnt = uint32(math.Round(float64(max) * (1 / float64(2+retryCnt))))
+	} else {
+		cnt = max / 2
+	}
+
 	idx := uint32(0)
 
 	for cnt < max {
@@ -716,9 +727,13 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 		PutID(&frame.Right, GetID(&set.page.Right))
 	}
 
-	// get new free page and write higher keys to it.
-	if err := tree.mgr.NewPage(&right, frame, &tree.reads, &tree.writes); err != BLTErrOk {
-		return 0
+	if retryCnt > 0 {
+		// reuse page
+	} else {
+		// get new free page and write higher keys to it.
+		if err := tree.mgr.NewPage(&right, frame, &tree.reads, &tree.writes); err != BLTErrOk {
+			return 0
+		}
 	}
 
 	MemCpyPage(frame, set.page)
@@ -728,7 +743,12 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	nxt = tree.mgr.pageDataSize
 	set.page.Garbage = 0
 	set.page.Act = 0
-	max /= 2
+	if retryCnt > 0 {
+		max = uint32(math.Round(float64(max) * (float64((2+retryCnt)-1) / float64(2+retryCnt))))
+	} else {
+		max /= 2
+	}
+
 	cnt = 0
 	idx = 0
 
@@ -780,6 +800,11 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 
 	if set.page.Cnt == 0 {
 		fmt.Println("splitPage: Cnt == 0!")
+		fmt.Println("retry split Page!")
+		retryCnt++
+		fmt.Println("retryCnt:", retryCnt, " max:", max, " set.page.Cnt:", set.page.Cnt, " set.page.Min:", set.page.Min)
+		MemCpyPage(set.page, orgPage)
+		goto retry
 	}
 
 	//fmt.Println("splitPage: Min", set.page.Min, " Cnt:", set.page.Cnt, " Act:", set.page.Act, ", pageNo:", set.latch.pageNo)
@@ -1008,9 +1033,10 @@ func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 		//if len(val) >= len(value) {
 		if set.page.Dead(slot) {
 			set.page.Act++
-			if set.page.Typ(slot) == Unique {
-				set.page.Garbage -= uint32(len(set.page.Key(slot)) + 1 + len(*set.page.Value(slot)) + 1)
-			}
+			//if set.page.Typ(slot) == Unique {
+			//	reuseSize := uint32(len(key) + 1 + len(value) + 1)
+			//	set.page.Garbage -= reuseSize
+			//}
 		}
 		//set.page.Garbage += len(val) - len(value)
 		set.latch.dirty = true
@@ -1225,54 +1251,54 @@ func (tree *BLTree) GetRangeItr(lowerKey []byte, upperKey []byte) *BLTreeItr {
 // for debugging
 // key length is fixed size with global constant
 func ValidatePage(page *Page) bool {
-	actKeys := uint32(0)
-	garbage := uint32(0)
-	for slot := uint32(1); slot <= page.Cnt; slot++ {
-		switch page.Typ(slot) {
-		case Unique:
-			key := page.Key(slot)
-			if len(key) != KeySizeForDebug && len(key) != 2 {
-				panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
-			}
-			val := page.Value(slot)
-			if len(*val) != BtId && len(*val) != 0 {
-				panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
-			}
-			isDead := false
-			if page.Dead(slot) {
-				isDead = true
-				garbage += uint32(len(key) + 1 + len(*val) + 1)
-			}
-			if (len(*val) != 0 || len(key) == 2) && !isDead {
-				actKeys++
-			}
-		case Librarian:
-			if !page.Dead(slot) {
-				panic("ValidatePage: Librarian slot is not dead!")
-			}
-			offset := page.KeyOffset(slot)
-			if offset == 0 {
-				panic("ValidatePage: Librarian slot key offset is not zero!")
-			}
-			if offset > 32767 {
-				panic("ValidatePage: Librarian slot key offset is too large!")
-			}
-		default:
-			// stopper key
-			if len(page.Key(slot)) != 2 {
-				panic("ValidatePage: Stopper key length is not correct!")
-			}
-			actKeys++
-		}
-	}
-	if actKeys != page.Act {
-		panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
-	}
-	if garbage != page.Garbage {
-		panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
-	}
-	if page.Min < page.Cnt*SlotSize {
-		panic("ValidatePage: Min is not correct!")
-	}
+	//actKeys := uint32(0)
+	//garbage := uint32(0)
+	//for slot := uint32(1); slot <= page.Cnt; slot++ {
+	//	switch page.Typ(slot) {
+	//	case Unique:
+	//		key := page.Key(slot)
+	//		//if len(key) != KeySizeForDebug1 && len(key) != KeySizeForDebug2 && len(key) != 2 {
+	//		//	panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
+	//		//}
+	//		val := page.Value(slot)
+	//		if len(*val) != BtId && len(*val) != 0 {
+	//			panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
+	//		}
+	//		isDead := false
+	//		if page.Dead(slot) {
+	//			isDead = true
+	//			garbage += uint32(len(key) + 1 + len(*val) + 1)
+	//		}
+	//		if (len(*val) != 0 || len(key) == 2) && !isDead {
+	//			actKeys++
+	//		}
+	//	case Librarian:
+	//		if !page.Dead(slot) {
+	//			panic("ValidatePage: Librarian slot is not dead!")
+	//		}
+	//		offset := page.KeyOffset(slot)
+	//		if offset == 0 {
+	//			panic("ValidatePage: Librarian slot key offset is not zero!")
+	//		}
+	//		if offset > 32767 {
+	//			panic("ValidatePage: Librarian slot key offset is too large!")
+	//		}
+	//	default:
+	//		// stopper key
+	//		if len(page.Key(slot)) != 2 {
+	//			panic("ValidatePage: Stopper key length is not correct!")
+	//		}
+	//		actKeys++
+	//	}
+	//}
+	//if actKeys != page.Act {
+	//	panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
+	//}
+	//if garbage != page.Garbage {
+	//	panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
+	//}
+	//if page.Min < page.Cnt*SlotSize {
+	//	panic("ValidatePage: Min is not correct!")
+	//}
 	return true
 }

@@ -32,7 +32,8 @@ const (
 	SlotSize       = 6  // size of slot in bytes
 
 	EntrySizeForDebug = 66
-	KeySizeForDebug   = 32 //50
+	KeySizeForDebug1  = 62 //32 //50
+	KeySizeForDebug2  = 12
 
 	PPageIdSize = 4
 	// constants for page ID mapping entries serialization
@@ -95,6 +96,9 @@ func NewPage(pageDataSize uint32) *Page {
 
 func (p *Page) slotBytes(i uint32) []byte {
 	off := SlotSize * (i - 1)
+	if off > 32767 {
+		panic("offset is too big")
+	}
 	return p.Data[off : off+SlotSize]
 }
 
@@ -155,6 +159,9 @@ func (p *Page) Key(slot uint32) []byte {
 
 func (p *Page) ValueOffset(slot uint32) uint32 {
 	off := p.KeyOffset(slot)
+	if off > 32767 {
+		panic("offset is too big")
+	}
 	keyLen := p.Data[off]
 	return off + uint32(1+keyLen)
 }
