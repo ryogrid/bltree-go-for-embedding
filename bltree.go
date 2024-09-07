@@ -108,6 +108,10 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 	var value [BtId]byte
 	PutID(&value, set.latch.pageNo)
 
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	tree.mgr.PageLock(LockParent, set.latch)
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 
@@ -155,6 +159,9 @@ func (tree *BLTree) collapseRoot(root *PageSet) BLTErr {
 		tree.mgr.PageLock(LockDelete, child.latch)
 		tree.mgr.PageLock(LockWrite, child.latch)
 
+		if !ValidatePage(child.page) {
+			panic("collapseRoot: page is broken")
+		}
 		MemCpyPage(root.page, child.page)
 		root.latch.dirty = true
 		tree.mgr.PageFree(&child)
@@ -164,6 +171,9 @@ func (tree *BLTree) collapseRoot(root *PageSet) BLTErr {
 		}
 	}
 
+	if !ValidatePage(root.page) {
+		fmt.Println("collapseRoot: page is broken.")
+	}
 	tree.mgr.PageUnlock(LockWrite, root.latch)
 	tree.mgr.UnpinLatch(root.latch)
 	return BLTErrOk
@@ -202,6 +212,10 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 	// pull contents of right peer into our empty page
 	MemCpyPage(set.page, right.page)
 	set.latch.dirty = true
+
+	if !ValidatePage(set.page) {
+		panic("deletePage: page is broken.")
+	}
 
 	// mark right page deleted and point it to left page
 	// until we can post parent updates that remove access
@@ -274,20 +288,21 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 			set.page.SetDead(slot, true)
 			set.page.Garbage += uint32(1+len(ptr)) + uint32(1+len(val))
 			set.page.Act--
+			/*
+				// collapse empty slots beneath the fence
+				idx := set.page.Cnt - 1
+				for idx > 0 {
+					if set.page.Dead(idx) {
+						copy(set.page.slotBytes(idx), set.page.slotBytes(idx+1))
+						set.page.ClearSlot(set.page.Cnt)
+						set.page.Cnt--
+					} else {
+						break
+					}
 
-			// collapse empty slots beneath the fence
-			idx := set.page.Cnt - 1
-			for idx > 0 {
-				if set.page.Dead(idx) {
-					copy(set.page.slotBytes(idx), set.page.slotBytes(idx+1))
-					set.page.ClearSlot(set.page.Cnt)
-					set.page.Cnt--
-				} else {
-					break
+					idx = set.page.Cnt - 1
 				}
-
-				idx = set.page.Cnt - 1
-			}
+			*/
 			if !ValidatePage(set.page) {
 				panic("DeleteKey: page broken!")
 			}
@@ -316,6 +331,11 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 	if set.page.Act == 0 {
 		return tree.deletePage(&set, LockNone)
 	}
+
+	if !ValidatePage(set.page) {
+		panic("DeleteKey: page is broken.")
+	}
+
 	set.latch.dirty = true
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 	tree.mgr.UnpinLatch(set.latch)
@@ -539,6 +559,10 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 
 	page.Min = nxt
 	page.Cnt = idx
+
+	if !ValidatePage(page) {
+		panic("cleanPage: page is broken.")
+	}
 
 	// see if page has enough space now, or does it need splitting?
 	if page.Min > (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
@@ -942,6 +966,9 @@ func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 			return tree.err
 		}
 
+		if !ValidatePage(set.page) {
+			panic("InsertKey: page is broken.")
+		}
 		// if librarian slot == found slot, advance to real slot
 		if set.page.Typ(slot) == Librarian {
 			if KeyCmp(ptr, key) == 0 {
@@ -981,11 +1008,18 @@ func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 		//if len(val) >= len(value) {
 		if set.page.Dead(slot) {
 			set.page.Act++
+			if set.page.Typ(slot) == Unique {
+				set.page.Garbage -= uint32(len(set.page.Key(slot)) + 1 + len(*set.page.Value(slot)) + 1)
+			}
 		}
 		//set.page.Garbage += len(val) - len(value)
 		set.latch.dirty = true
 		set.page.SetDead(slot, false)
 		set.page.SetValue(value[:], slot)
+
+		if !ValidatePage(set.page) {
+			panic("InsertKey: page is broken.")
+		}
 		tree.mgr.PageUnlock(LockWrite, set.latch)
 		tree.mgr.UnpinLatch(set.latch)
 		return BLTErrOk
