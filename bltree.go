@@ -253,6 +253,10 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 	}
 	ptr := set.page.Key(slot)
 
+	if !ValidatePage(set.page) {
+		panic("page is broken.")
+	}
+
 	// if librarian slot, advance to real slot
 	if set.page.Typ(slot) == Librarian {
 		slot++
@@ -1188,6 +1192,7 @@ func (tree *BLTree) GetRangeItr(lowerKey []byte, upperKey []byte) *BLTreeItr {
 // key length is fixed size with global constant
 func ValidatePage(page *Page) bool {
 	actKeys := uint32(0)
+	garbage := uint32(0)
 	for slot := uint32(1); slot <= page.Cnt; slot++ {
 		switch page.Typ(slot) {
 		case Unique:
@@ -1202,6 +1207,7 @@ func ValidatePage(page *Page) bool {
 			isDead := false
 			if page.Dead(slot) {
 				isDead = true
+				garbage += uint32(len(key) + 1 + len(*val) + 1)
 			}
 			if (len(*val) != 0 || len(key) == 2) && !isDead {
 				actKeys++
@@ -1227,6 +1233,9 @@ func ValidatePage(page *Page) bool {
 	}
 	if actKeys != page.Act {
 		panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
+	}
+	if garbage != page.Garbage {
+		panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
 	}
 	if page.Min < page.Cnt*SlotSize {
 		panic("ValidatePage: Min is not correct!")
