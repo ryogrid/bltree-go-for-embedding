@@ -224,6 +224,104 @@ func TestBLTree_deleteAll(t *testing.T) {
 	}
 }
 
+func TestBLTree_deleteManyConcurrently3(t *testing.T) {
+	pbm := NewParentBufMgrDummy(nil)
+	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*20*2, pbm, nil)
+
+	//keyTotal := 160000000
+	keyTotal := 1600000
+	routineNum := 20 //1 //20
+
+	keys := make([][]byte, keyTotal)
+	for i := 0; i < keyTotal; i++ {
+		bs := make([]byte, 8)
+		binary.LittleEndian.PutUint64(bs, uint64(i))
+		bs = append(bs, bs...)
+		bs = append(bs, bs...)
+		keys[i] = bs
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(routineNum)
+
+	start := time.Now()
+	bltree := NewBLTree(mgr)
+	for r := 0; r < routineNum; r++ {
+		go func(n int) {
+			for i := 0; i < keyTotal; i++ {
+				if i%routineNum != n {
+					continue
+				}
+				if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 1, 2, 3, 4, 5}, true); err != BLTErrOk {
+					t.Errorf("in goroutine%d InsertKey() = %v, want %v", n, err, BLTErrOk)
+				}
+
+				// insert dplicate key
+				if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 1, 2, 3, 4, 5}, true); err != BLTErrOk {
+					t.Errorf("in goroutine%d InsertKey() = %v, want %v", n, err, BLTErrOk)
+				}
+
+				if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
+					t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
+					panic("FindKey() != 6")
+				}
+			}
+			wg.Done()
+		}(r)
+	}
+	wg.Wait()
+	t.Logf("insert %d keys and delete skip one concurrently. duration =  %v", keyTotal, time.Since(start))
+
+	wg = sync.WaitGroup{}
+	wg.Add(routineNum)
+
+	start = time.Now()
+
+	for r := 0; r < routineNum; r++ {
+		go func(n int) {
+			// dummy key ( not exist on container )
+			dummyKey := make([]byte, 8)
+			binary.LittleEndian.PutUint64(dummyKey, uint64(keyTotal+1))
+
+			//for i := 0; i < keyTotal; i++ {
+			for i := keyTotal - 1; i >= 0; i-- {
+				if i%routineNum != n {
+					continue
+				}
+
+				// hit delete
+				if err := bltree.DeleteKey(keys[i], 0); err != BLTErrOk {
+					t.Errorf("DeleteKey() = %v, want %v", err, BLTErrOk)
+				}
+
+				// no hit delete
+				if err := bltree.DeleteKey(keys[i], 0); err != BLTErrOk {
+					t.Errorf("DeleteKey() = %v, want %v", err, BLTErrOk)
+				}
+
+				// no hit delete ( dummy )
+				if err := bltree.DeleteKey(dummyKey, 0); err != BLTErrOk {
+					t.Errorf("DeleteKey() = %v, want %v", err, BLTErrOk)
+				}
+
+				// insert again
+				if err := bltree.InsertKey(keys[i], 0, [BtId]byte{0, 1, 2, 3, 4, 5}, true); err != BLTErrOk {
+					t.Errorf("in goroutine%d InsertKey() = %v, want %v", n, err, BLTErrOk)
+				}
+
+				// check existance of re-inserted key
+				if found, _, _ := bltree.FindKey(keys[i], BtId); found != 6 {
+					t.Errorf("FindKey() = %v, want %v, key %v", found, 6, keys[i])
+					panic("FindKey() != 6")
+				}
+			}
+			wg.Done()
+		}(r)
+	}
+	wg.Wait()
+	t.Logf("delete and insert %d keys. duration =  %v", keyTotal, time.Since(start))
+}
+
 func TestBLTree_deleteManyConcurrently2(t *testing.T) {
 	pbm := NewParentBufMgrDummy(nil)
 	mgr := NewBufMgr(12, HASH_TABLE_ENTRY_CHAIN_LEN*20*2, pbm, nil)

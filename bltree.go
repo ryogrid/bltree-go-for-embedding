@@ -1271,9 +1271,9 @@ func ValidatePage(page *Page) bool {
 	//	switch page.Typ(slot) {
 	//	case Unique:
 	//		key := page.Key(slot)
-	//		//if len(key) != KeySizeForDebug1 && len(key) != KeySizeForDebug2 && len(key) != 2 {
-	//		//	panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
-	//		//}
+	//		if len(key) != KeySizeForDebug && len(key) != 2 {
+	//			panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
+	//		}
 	//		val := page.Value(slot)
 	//		if len(*val) != BtId && len(*val) != 0 {
 	//			panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
@@ -1308,9 +1308,9 @@ func ValidatePage(page *Page) bool {
 	//if actKeys != page.Act {
 	//	panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
 	//}
-	//if garbage != page.Garbage {
-	//	panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
-	//}
+	////if garbage != page.Garbage {
+	////	panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
+	////}
 	//if page.Min < page.Cnt*SlotSize {
 	//	panic("ValidatePage: Min is not correct!")
 	//}
