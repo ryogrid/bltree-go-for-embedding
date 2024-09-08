@@ -502,8 +502,18 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 		panic("cleanPage: page broken!")
 	}
 
-	if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
-		return slot
+	// skip cleanup and proceed to split
+	// if there's not enough garbage to bother with.
+
+	//dataSpaceAfterClean := (tree.mgr.pageDataSize - page.Min) + page.Garbage
+	dataSpaceAfterClean := uint32(1+keyLen+1+valLen) * (page.Act + 1)
+
+	//afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
+	afterCleanSize := dataSpaceAfterClean + (page.Act*2+1)*SlotSize
+	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
+		return 0
 	}
 
 	//if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 && page.Min > (max+2)*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
@@ -511,24 +521,15 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	//	return slot
 	//}
 
-	// skip cleanup and proceed to split
-	// if there's not enough garbage to bother with.
-
-	//dataSpaceAfterClean := (tree.mgr.pageDataSize - page.Min) + page.Garbage
-	dataSpaceAfterClean := uint32(1+keyLen+1+valLen) * (page.Act + 1)
 	if dataSpaceAfterClean+(page.Act*2+1)*SlotSize > tree.mgr.pageDataSize {
 		// in this case, after cleanup, header space and data space overlaps and it's an illegal state of page
-		tree.removeDeletedAndLibrarianSlots(set.page, slot)
-		set.latch.dirty = true
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
 		return 0
 	}
 
-	//afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
-	afterCleanSize := dataSpaceAfterClean + (page.Act*2+1)*SlotSize
-	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
-		tree.removeDeletedAndLibrarianSlots(set.page, slot)
-		set.latch.dirty = true
-		return 0
+	if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		return slot
 	}
 
 	frame := NewPage(tree.mgr.pageDataSize)
@@ -600,10 +601,14 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	}
 
 	// see if page has enough space now, or does it need splitting?
-	if page.Min > (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+	if tree.mgr.pageDataSize-page.Min < tree.mgr.pageDataSize/5 {
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
+		return 0
+	} else if page.Min > (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
 		return newSlot
 	} else {
-		return 0
+		panic("cleanPage: page is broken.")
 	}
 }
 
