@@ -658,8 +658,11 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	var right PageSet
 	orgPage := NewPage(tree.mgr.pageDataSize)
 	MemCpyPage(orgPage, set.page)
+	copy(orgPage.Right[:], set.page.Right[:])
+	//orgLatch := set.latch
 
 	retryCnt := int(0)
+	priorCnt := uint32(0)
 
 	// split higher half of keys to frame
 retry:
@@ -667,9 +670,11 @@ retry:
 	max := set.page.Cnt
 	var cnt uint32
 	if retryCnt > 0 {
-		cnt = uint32(math.Round(float64(max) * (1 / float64(2+retryCnt))))
+		cnt = uint32(math.Round(float64(max) * (1.0 / float64(2+retryCnt))))
+		priorCnt = cnt
 	} else {
 		cnt = max / 2
+		priorCnt = cnt
 	}
 
 	idx := uint32(0)
@@ -727,13 +732,19 @@ retry:
 		PutID(&frame.Right, GetID(&set.page.Right))
 	}
 
-	if retryCnt > 0 {
-		// reuse page
-	} else {
-		// get new free page and write higher keys to it.
-		if err := tree.mgr.NewPage(&right, frame, &tree.reads, &tree.writes); err != BLTErrOk {
-			return 0
-		}
+	//if retryCnt > 0 {
+	//	// reuse page
+	//} else {
+	//	// get new free page and write higher keys to it.
+	//	if err := tree.mgr.NewPage(&right, frame, &tree.reads, &tree.writes); err != BLTErrOk {
+	//		return 0
+	//	}
+	//	secondLatch := right.latch
+	//}
+
+	// get new free page and write higher keys to it.
+	if err := tree.mgr.NewPage(&right, frame, &tree.reads, &tree.writes); err != BLTErrOk {
+		return 0
 	}
 
 	MemCpyPage(frame, set.page)
@@ -743,11 +754,16 @@ retry:
 	nxt = tree.mgr.pageDataSize
 	set.page.Garbage = 0
 	set.page.Act = 0
+	//if retryCnt > 0 {
+	//	max = uint32(math.Round(float64(max) * (float64((2+retryCnt)-1) / float64(2+retryCnt))))
+	//} else {
+	//	max /= 2
+	//}
+
 	if retryCnt > 0 {
-		max = uint32(math.Round(float64(max) * (float64((2+retryCnt)-1) / float64(2+retryCnt))))
-	} else {
-		max /= 2
+		fmt.Println("retry split Page! priorCnt:", priorCnt, " max:", max, " set.page.Cnt:", set.page.Cnt, " set.page.Min:", set.page.Min)
 	}
+	max = max - priorCnt
 
 	cnt = 0
 	idx = 0
@@ -803,7 +819,11 @@ retry:
 		fmt.Println("retry split Page!")
 		retryCnt++
 		fmt.Println("retryCnt:", retryCnt, " max:", max, " set.page.Cnt:", set.page.Cnt, " set.page.Min:", set.page.Min)
+		tree.mgr.PageLock(LockWrite, right.latch)
+		tree.mgr.PageLock(LockDelete, right.latch)
+		tree.mgr.PageFree(&right)
 		MemCpyPage(set.page, orgPage)
+		//set.latch = orgLatch
 		goto retry
 	}
 
