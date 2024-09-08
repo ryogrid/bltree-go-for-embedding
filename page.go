@@ -33,7 +33,7 @@ const (
 	SlotSize       = 6  // size of slot in bytes
 
 	EntrySizeForDebug = 66
-	KeySizeForDebug   = 32 //50
+	KeySizeForDebug   = 12 // Integer //50
 
 	PPageIdSize = 4
 	// constants for page ID mapping entries serialization
