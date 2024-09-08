@@ -754,16 +754,16 @@ retry:
 	nxt = tree.mgr.pageDataSize
 	set.page.Garbage = 0
 	set.page.Act = 0
-	//if retryCnt > 0 {
-	//	max = uint32(math.Round(float64(max) * (float64((2+retryCnt)-1) / float64(2+retryCnt))))
-	//} else {
-	//	max /= 2
-	//}
 
 	if retryCnt > 0 {
 		fmt.Println("retry split Page! priorCnt:", priorCnt, " max:", max, " set.page.Cnt:", set.page.Cnt, " set.page.Min:", set.page.Min)
 	}
-	max = max - priorCnt
+	//max = max - priorCnt
+	if retryCnt > 0 {
+		max = max - priorCnt
+	} else {
+		max /= 2
+	}
 
 	cnt = 0
 	idx = 0

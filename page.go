@@ -3,6 +3,7 @@ package blink_tree
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 )
 
 // SlotType
@@ -96,7 +97,7 @@ func NewPage(pageDataSize uint32) *Page {
 func (p *Page) slotBytes(i uint32) []byte {
 	off := SlotSize * (i - 1)
 	if off > 32767 {
-		panic("offset is too big")
+		panic(fmt.Sprintf("offset is too big : %d", off))
 	}
 	return p.Data[off : off+SlotSize]
 }
