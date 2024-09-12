@@ -395,6 +395,7 @@ func (tree *BLTree) findNext(set *PageSet, slot uint32) uint32 {
 func (tree *BLTree) FindKey(key []byte, valMax int) (ret int, foundKey []byte, foundValue []byte) {
 	var set PageSet
 	ret = -1
+
 	slot := tree.mgr.PageFetch(&set, key, 0, LockRead, &tree.reads, &tree.writes)
 	for ; slot > 0; slot = tree.findNext(&set, slot) {
 		ptr := set.page.Key(slot)
@@ -983,6 +984,7 @@ func (tree *BLTree) newDup() Uid {
 	return Uid(atomic.AddUint64(&(&tree.mgr.pageZero).dups, 1))
 }
 
+// Attention: length of key should be fixed size
 // Note: currently, uniq argument is always true
 // InsertKey insert new key into the btree at a given level. either add a new key or update/add an existing one
 func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool) BLTErr {
