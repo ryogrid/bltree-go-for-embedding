@@ -112,6 +112,10 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 		panic("fixFence: page is broken.")
 	}
 
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	tree.mgr.PageLock(LockParent, set.latch)
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 
@@ -126,8 +130,13 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 		return err
 	}
 
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	tree.mgr.PageUnlock(LockParent, set.latch)
 	tree.mgr.UnpinLatch(set.latch)
+
 	return BLTErrOk
 }
 
@@ -241,6 +250,13 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 	// delete old lower key to our node
 	if err := tree.DeleteKey(lowerFence, set.page.Lvl+1); err != BLTErrOk {
 		return err
+	}
+
+	if !ValidatePage(right.page) {
+		panic("fixFence: page is broken.")
+	}
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
 	}
 
 	// obtain delete and write locks to right node
@@ -601,7 +617,8 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	}
 
 	// see if page has enough space now, or does it need splitting?
-	if tree.mgr.pageDataSize-page.Min < tree.mgr.pageDataSize/5 {
+	//if tree.mgr.pageDataSize-page.Min < tree.mgr.pageDataSize/5 {
+	if page.Min < tree.mgr.pageDataSize/5 {
 		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
 		//set.latch.dirty = true
 		return 0
@@ -687,6 +704,9 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	// split higher half of keys to frame
 	frame := NewPage(tree.mgr.pageDataSize)
 	max := set.page.Cnt
+	if max <= 1 {
+		panic("splitPage: max <= 1")
+	}
 	cnt := max / 2
 
 	idx := uint32(0)
