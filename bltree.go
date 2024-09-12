@@ -2,7 +2,7 @@ package blink_tree
 
 import (
 	"bytes"
-	"log"
+	"fmt"
 	"sync/atomic"
 )
 
@@ -108,6 +108,14 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 	var value [BtId]byte
 	PutID(&value, set.latch.pageNo)
 
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	tree.mgr.PageLock(LockParent, set.latch)
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 
@@ -122,8 +130,13 @@ func (tree *BLTree) fixFence(set *PageSet, lvl uint8) BLTErr {
 		return err
 	}
 
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	tree.mgr.PageUnlock(LockParent, set.latch)
 	tree.mgr.UnpinLatch(set.latch)
+
 	return BLTErrOk
 }
 
@@ -155,6 +168,9 @@ func (tree *BLTree) collapseRoot(root *PageSet) BLTErr {
 		tree.mgr.PageLock(LockDelete, child.latch)
 		tree.mgr.PageLock(LockWrite, child.latch)
 
+		if !ValidatePage(child.page) {
+			panic("collapseRoot: page is broken")
+		}
 		MemCpyPage(root.page, child.page)
 		root.latch.dirty = true
 		tree.mgr.PageFree(&child)
@@ -164,6 +180,9 @@ func (tree *BLTree) collapseRoot(root *PageSet) BLTErr {
 		}
 	}
 
+	if !ValidatePage(root.page) {
+		fmt.Println("collapseRoot: page is broken.")
+	}
 	tree.mgr.PageUnlock(LockWrite, root.latch)
 	tree.mgr.UnpinLatch(root.latch)
 	return BLTErrOk
@@ -203,6 +222,10 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 	MemCpyPage(set.page, right.page)
 	set.latch.dirty = true
 
+	if !ValidatePage(set.page) {
+		panic("deletePage: page is broken.")
+	}
+
 	// mark right page deleted and point it to left page
 	// until we can post parent updates that remove access
 	// to the deleted page.
@@ -229,6 +252,13 @@ func (tree *BLTree) deletePage(set *PageSet, mode BLTLockMode) BLTErr {
 		return err
 	}
 
+	if !ValidatePage(right.page) {
+		panic("fixFence: page is broken.")
+	}
+	if !ValidatePage(set.page) {
+		panic("fixFence: page is broken.")
+	}
+
 	// obtain delete and write locks to right node
 	tree.mgr.PageUnlock(LockParent, right.latch)
 	tree.mgr.PageLock(LockDelete, right.latch)
@@ -252,6 +282,10 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 		return tree.err
 	}
 	ptr := set.page.Key(slot)
+
+	if !ValidatePage(set.page) {
+		panic("page is broken.")
+	}
 
 	// if librarian slot, advance to real slot
 	if set.page.Typ(slot) == Librarian {
@@ -284,6 +318,9 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 
 				idx = set.page.Cnt - 1
 			}
+			if !ValidatePage(set.page) {
+				panic("DeleteKey: page broken!")
+			}
 		}
 	}
 
@@ -309,6 +346,11 @@ func (tree *BLTree) DeleteKey(key []byte, lvl uint8) BLTErr {
 	if set.page.Act == 0 {
 		return tree.deletePage(&set, LockNone)
 	}
+
+	if !ValidatePage(set.page) {
+		panic("DeleteKey: page is broken.")
+	}
+
 	set.latch.dirty = true
 	tree.mgr.PageUnlock(LockWrite, set.latch)
 	tree.mgr.UnpinLatch(set.latch)
@@ -353,6 +395,7 @@ func (tree *BLTree) findNext(set *PageSet, slot uint32) uint32 {
 func (tree *BLTree) FindKey(key []byte, valMax int) (ret int, foundKey []byte, foundValue []byte) {
 	var set PageSet
 	ret = -1
+
 	slot := tree.mgr.PageFetch(&set, key, 0, LockRead, &tree.reads, &tree.writes)
 	for ; slot > 0; slot = tree.findNext(&set, slot) {
 		ptr := set.page.Key(slot)
@@ -407,6 +450,59 @@ func (tree *BLTree) FindKey(key []byte, valMax int) (ret int, foundKey []byte, f
 	return ret, foundKey, foundValue
 }
 
+func (tree *BLTree) removeDeletedAndLibrarianSlots(page *Page, slot uint32) {
+	// remove deleted keys
+	// remove librarian slots
+
+	nxt := tree.mgr.pageDataSize
+	max := page.Cnt
+
+	frame := NewPage(tree.mgr.pageDataSize)
+	MemCpyPage(frame, page)
+
+	// skip page info and set rest of page to zero
+	page.Data = make([]byte, tree.mgr.pageDataSize)
+	page.Garbage = 0
+	page.Act = 0
+
+	// remove deleted keys and librarian slots
+	idx := uint32(0)
+	for cnt := uint32(0); cnt < max; {
+		cnt++
+
+		if cnt < max && frame.Dead(cnt) {
+			continue
+		}
+
+		// copy the value across
+		val := *frame.Value(cnt)
+		nxt -= uint32(len(val) + 1)
+		copy(page.Data[nxt:], append([]byte{byte(len(val))}, val[:]...))
+
+		// copy the key across
+		key := frame.Key(cnt)
+		nxt -= uint32(len(key) + 1)
+		copy(page.Data[nxt:], append([]byte{byte(len(key))}, key[:]...))
+
+		// not make librarian slot
+
+		// set up the slot
+		idx++
+		page.SetKeyOffset(idx, nxt)
+		page.SetTyp(idx, frame.Typ(cnt))
+
+		page.SetDead(idx, false)
+		page.Act++
+	}
+
+	page.Min = nxt
+	page.Cnt = idx
+
+	if !ValidatePage(page) {
+		panic("cleanPage: page is broken.")
+	}
+}
+
 // cleanPage
 //
 // check page for space available,
@@ -419,16 +515,38 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	page := set.page
 	max := page.Cnt
 
-	if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
-		return slot
+	if !ValidatePage(page) {
+		panic("cleanPage: page broken!")
 	}
 
 	// skip cleanup and proceed to split
 	// if there's not enough garbage to bother with.
-	afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
 
+	//dataSpaceAfterClean := (tree.mgr.pageDataSize - page.Min) + page.Garbage
+	dataSpaceAfterClean := uint32(1+keyLen+1+valLen) * (page.Act + 1)
+
+	//afterCleanSize := (tree.mgr.pageDataSize - page.Min) - page.Garbage + (page.Act*2+1)*SlotSize
+	afterCleanSize := dataSpaceAfterClean + (page.Act*2+1)*SlotSize
 	if int(tree.mgr.pageDataSize)-int(afterCleanSize) < int(tree.mgr.pageDataSize/5) {
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
 		return 0
+	}
+
+	//if page.Min > slot*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 && page.Min > (max+2)*uint32(SlotSize)+uint32(keyLen)+1+uint32(keyLen)+1 {
+	//	//fmt.Println("cleanPage return slot. pageNo:", set.latch.pageNo, " slot:", slot, " Cnt:", page.Cnt, " Min:", page.Min)
+	//	return slot
+	//}
+
+	if dataSpaceAfterClean+(page.Act*2+1)*SlotSize > tree.mgr.pageDataSize {
+		// in this case, after cleanup, header space and data space overlaps and it's an illegal state of page
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
+		return 0
+	}
+
+	if page.Min >= (max+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		return slot
 	}
 
 	frame := NewPage(tree.mgr.pageDataSize)
@@ -445,7 +563,6 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	idx := uint32(0)
 	for cnt := uint32(0); cnt < max; {
 		cnt++
-
 		if cnt == slot {
 			if idx == 0 {
 				// because librarian slot will not be added
@@ -454,6 +571,7 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 				newSlot = idx + 2
 			}
 		}
+
 		if cnt < max && frame.Dead(cnt) {
 			continue
 		}
@@ -481,8 +599,9 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 		page.SetKeyOffset(idx, nxt)
 		page.SetTyp(idx, frame.Typ(cnt))
 
-		if nxt < idx*SlotSize {
-			log.Printf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, slot, frame.PageHeader, frame.Data)
+		if nxt <= idx*SlotSize {
+			//log.Printf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data)
+			panic(fmt.Sprintf("cleanPage: nxt overlaps with the slot area!!! nxt: %d, idx: %d, cnt: %d, keyLen: %d, valLen: %d, set.latch.pageNo: %d, slot: %d, frame.header: %v, frame.data: %v\n", nxt, idx, set.page.Cnt, keyLen, valLen, set.latch.pageNo, slot, frame.PageHeader, frame.Data))
 		}
 
 		page.SetDead(idx, frame.Dead(cnt))
@@ -494,12 +613,21 @@ func (tree *BLTree) cleanPage(set *PageSet, keyLen uint8, slot uint32, valLen ui
 	page.Min = nxt
 	page.Cnt = idx
 
-	// see if page has enough space now, or does it need splitting?
-	if page.Min >= (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
-		return newSlot
+	if !ValidatePage(page) {
+		panic("cleanPage: page is broken.")
 	}
 
-	return 0
+	// see if page has enough space now, or does it need splitting?
+	//if tree.mgr.pageDataSize-page.Min < tree.mgr.pageDataSize/5 {
+	if page.Min < tree.mgr.pageDataSize/5 {
+		//tree.removeDeletedAndLibrarianSlots(set.page, slot)
+		//set.latch.dirty = true
+		return 0
+	} else if page.Min > (idx+2)*SlotSize+uint32(keyLen)+1+uint32(valLen)+1 {
+		return newSlot
+	} else {
+		panic("cleanPage: page is broken.")
+	}
 }
 
 // splitRoot
@@ -550,6 +678,14 @@ func (tree *BLTree) splitRoot(root *PageSet, right *Latchs) BLTErr {
 	root.page.Act = 2
 	root.page.Lvl++
 
+	//if root.page.Min < root.page.Cnt*SlotSize {
+	//	fmt.Println("splitRoot: need check!")
+	//}
+
+	if !ValidatePage(root.page) {
+		panic("splitRoot: page broken!")
+	}
+
 	// release and unpin root pages
 	tree.mgr.PageUnlock(LockWrite, root.latch)
 	tree.mgr.UnpinLatch(root.latch)
@@ -569,7 +705,11 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	// split higher half of keys to frame
 	frame := NewPage(tree.mgr.pageDataSize)
 	max := set.page.Cnt
+	if max <= 1 {
+		panic("splitPage: max <= 1")
+	}
 	cnt := max / 2
+
 	idx := uint32(0)
 
 	for cnt < max {
@@ -612,6 +752,14 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	frame.Cnt = idx
 	frame.Lvl = lvl
 
+	//if (idx+1)*6+(frame.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+	//	//fmt.Println("splitPage: need check!")
+	//	panic("splitPage: page broken!")
+	//}
+	if !ValidatePage(frame) {
+		panic("splitPage: page broken!")
+	}
+
 	// link right node
 	if set.latch.pageNo > RootPage {
 		PutID(&frame.Right, GetID(&set.page.Right))
@@ -629,7 +777,9 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	nxt = tree.mgr.pageDataSize
 	set.page.Garbage = 0
 	set.page.Act = 0
+
 	max /= 2
+
 	cnt = 0
 	idx = 0
 
@@ -669,6 +819,21 @@ func (tree *BLTree) splitPage(set *PageSet) uint {
 	PutID(&set.page.Right, right.latch.pageNo)
 	set.page.Min = nxt
 	set.page.Cnt = idx
+
+	//if (idx+1)*6+(set.page.Act-1)*EntrySizeForDebug+3 > tree.mgr.pageDataSize {
+	//	//fmt.Println("splitPage: need check!")
+	//	panic("splitPage: page broken!")
+	//}
+
+	if !ValidatePage(set.page) {
+		panic("splitPage: page broken!")
+	}
+
+	if set.page.Cnt == 0 {
+		panic("splitPage: Cnt == 0!")
+	}
+
+	//fmt.Println("splitPage: Min", set.page.Min, " Cnt:", set.page.Cnt, " Act:", set.page.Act, ", pageNo:", set.latch.pageNo)
 
 	return right.latch.entry
 }
@@ -729,6 +894,19 @@ func (tree *BLTree) insertSlot(
 	typ SlotType,
 	release bool,
 ) BLTErr {
+	//if set.latch.pageNo == 14233 && slot >= 101 {
+	//	fmt.Println("insertSlot: need check!")
+	//}
+
+	//if set.page.Act*EntrySizeForDebug+set.page.Cnt*8+8+40 > tree.mgr.pageDataSize {
+	//	fmt.Println("insertSlot: need check!")
+	//}
+
+	//if set.page.Min < slot*SlotSize+uint32(len(key))+1+uint32(len(value))+1 {
+	//	fmt.Println("insertSlot: over Min! pageNo:", set.latch.pageNo, " slot:", slot, " Min:", set.page.Min, " Cnt:", set.page.Cnt)
+	//	panic("insertSlot: page broken")
+	//}
+
 	// if found slot > desired slot and previous slot is a librarian slot, use it
 	if slot > 1 {
 		if set.page.Typ(slot-1) == Librarian {
@@ -785,6 +963,14 @@ func (tree *BLTree) insertSlot(
 	set.page.SetTyp(slot, typ)
 	set.page.SetDead(slot, false)
 
+	//if set.latch.pageNo == 14233 && (slot == 101) {
+	//	fmt.Println("insertSlot: need check!")
+	//}
+
+	if !ValidatePage(set.page) {
+		panic("insertSlot: page broken")
+	}
+
 	if release {
 		tree.mgr.PageUnlock(LockWrite, set.latch)
 		tree.mgr.UnpinLatch(set.latch)
@@ -798,6 +984,7 @@ func (tree *BLTree) newDup() Uid {
 	return Uid(atomic.AddUint64(&(&tree.mgr.pageZero).dups, 1))
 }
 
+// Attention: length of key should be fixed size
 // Note: currently, uniq argument is always true
 // InsertKey insert new key into the btree at a given level. either add a new key or update/add an existing one
 func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool) BLTErr {
@@ -831,6 +1018,9 @@ func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 			return tree.err
 		}
 
+		if !ValidatePage(set.page) {
+			panic("InsertKey: page is broken.")
+		}
 		// if librarian slot == found slot, advance to real slot
 		if set.page.Typ(slot) == Librarian {
 			if KeyCmp(ptr, key) == 0 {
@@ -870,11 +1060,19 @@ func (tree *BLTree) InsertKey(key []byte, lvl uint8, value [BtId]byte, uniq bool
 		//if len(val) >= len(value) {
 		if set.page.Dead(slot) {
 			set.page.Act++
+			//if set.page.Typ(slot) == Unique {
+			//	reuseSize := uint32(len(key) + 1 + len(value) + 1)
+			//	set.page.Garbage -= reuseSize
+			//}
 		}
 		//set.page.Garbage += len(val) - len(value)
 		set.latch.dirty = true
 		set.page.SetDead(slot, false)
 		set.page.SetValue(value[:], slot)
+
+		if !ValidatePage(set.page) {
+			panic("InsertKey: page is broken.")
+		}
 		tree.mgr.PageUnlock(LockWrite, set.latch)
 		tree.mgr.UnpinLatch(set.latch)
 		return BLTErrOk
@@ -957,10 +1155,28 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	retKeyArr = make([][]byte, 0)
 	retValArr = make([][]byte, 0)
 	itrCnt := 0
+	var right Uid
 
+	freePinLatchs := func(latch *Latchs) {
+		//// page out on parent buffer manager is safe though other threads may be accessing the page
+		//// because BLTree doesn't access the parent page's memory directly
+		//latch.pin = 0
+		tree.mgr.PageUnlock(LockRead, latch)
+		tree.mgr.UnpinLatch(latch)
+	}
+
+	tmpSet := new(PageSet)
 	curSet := new(PageSet)
+	curSet.page = NewPage(tree.mgr.pageDataSize)
 
-	slot := tree.mgr.PageFetch(curSet, lowerKey, 0, LockRead, &tree.reads, &tree.writes)
+	//slot := tree.mgr.PageFetch(curSet, lowerKey, 0, LockRead, &tree.reads, &tree.writes)
+	slot := tree.mgr.PageFetch(tmpSet, lowerKey, 0, LockRead, &tree.reads, &tree.writes)
+	if slot > 0 {
+		MemCpyPage(curSet.page, tmpSet.page)
+		freePinLatchs(tmpSet.latch)
+	} else {
+		return 0, *new([][]byte), *new([][]byte)
+	}
 
 	getKV := func() bool {
 		//slotType := curSet.page.Typ(slot)
@@ -1003,14 +1219,6 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		return true
 	}
 
-	freePinLatchs := func(latch *Latchs) {
-		//// page out on parent buffer manager is safe though other threads may be accessing the page
-		//// because BLTree doesn't access the parent page's memory directly
-		//latch.pin = 0
-		tree.mgr.PageUnlock(LockRead, latch)
-		tree.mgr.UnpinLatch(latch)
-	}
-
 	readEntriesOfCurSet := func() bool {
 		for slot <= curSet.page.Cnt {
 			if slot == 0 {
@@ -1022,10 +1230,13 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 			} else if curSet.page.Typ(slot) != Unique {
 				slot++
 				continue
-			} else {
+				//} else if right > 0 || slot <= curSet.page.Cnt {
+			} else if right > 0 || slot <= curSet.page.Cnt {
 				if ok := getKV(); !ok {
 					return false
 				}
+			} else {
+				break
 			}
 			slot++
 		}
@@ -1033,7 +1244,7 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 	}
 
 	for {
-		right := GetID(&curSet.page.Right)
+		right = GetID(&curSet.page.Right)
 
 		// reached tail
 		if right == 0 {
@@ -1047,23 +1258,24 @@ func (tree *BLTree) RangeScan(lowerKey []byte, upperKey []byte) (num int, retKey
 		}
 
 		//prevPageLatch := curSet.latch
+		//// free lock and unpin
+		//freePinLatchs(curSet.latch)
 
-		// free lock and unpin
-		freePinLatchs(curSet.latch)
-
-		curSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
-		if curSet.latch != nil {
-			curSet.page = tree.mgr.GetRefOfPageAtPool(curSet.latch)
+		tmpSet.latch = tree.mgr.PinLatch(right, true, &tree.reads, &tree.writes)
+		if tmpSet.latch != nil {
+			tmpSet.page = tree.mgr.GetRefOfPageAtPool(tmpSet.latch)
 			slot = 0
 		} else {
-			panic("PinLatch failed")
+			//panic("PinLatch failed")
+			return 0, *new([][]byte), *new([][]byte)
 		}
-		tree.mgr.PageLock(LockRead, curSet.latch)
-
+		tree.mgr.PageLock(LockRead, tmpSet.latch)
+		MemCpyPage(curSet.page, tmpSet.page)
+		freePinLatchs(tmpSet.latch)
 	}
 
-	// free the last page latch
-	freePinLatchs(curSet.latch)
+	//// free the last page latch
+	//freePinLatchs(curSet.latch)
 	return itrCnt, retKeyArr, retValArr
 }
 
@@ -1075,4 +1287,66 @@ func (tree *BLTree) GetRangeItr(lowerKey []byte, upperKey []byte) *BLTreeItr {
 		curIdx: 0,
 		elems:  uint32(elems),
 	}
+}
+
+// for debugging
+// key length is fixed size with global constant
+func ValidatePage(page *Page) bool {
+	//actKeys := uint32(0)
+	//garbage := uint32(0)
+	//for slot := uint32(1); slot <= page.Cnt; slot++ {
+	//	switch page.Typ(slot) {
+	//	case Unique:
+	//		key := page.Key(slot)
+	//		//if len(key) != KeySizeForDebug && len(key) != 2 {
+	//		//	panic(fmt.Sprintf("ValidatePage: Unique key length is not correct! key: %v\n", key))
+	//		//}
+	//		val := page.Value(slot)
+	//		if len(*val) != BtId && len(*val) != 0 {
+	//			panic(fmt.Sprintf("ValidatePage: Unique value length is not correct! val: %v\n", val))
+	//		}
+	//		isDead := false
+	//		if page.Dead(slot) {
+	//			isDead = true
+	//			garbage += uint32(len(key) + 1 + len(*val) + 1)
+	//		}
+	//		if (len(*val) != 0 || len(key) == 2) && !isDead {
+	//			actKeys++
+	//		}
+	//	case Librarian:
+	//		if !page.Dead(slot) {
+	//			panic("ValidatePage: Librarian slot is not dead!")
+	//		}
+	//		offset := page.KeyOffset(slot)
+	//		if offset == 0 {
+	//			panic("ValidatePage: Librarian slot key offset is not zero!")
+	//		}
+	//		if offset > 32767 {
+	//			panic("ValidatePage: Librarian slot key offset is too large!")
+	//		}
+	//		offset = page.ValueOffset(slot)
+	//		if offset == 0 {
+	//			panic("ValidatePage: Librarian slot value offset is not zero!")
+	//		}
+	//		if offset > 32767 {
+	//			panic("ValidatePage: Librarian slot value offset is too large!")
+	//		}
+	//	default:
+	//		// stopper key
+	//		if len(page.Key(slot)) != 2 {
+	//			panic("ValidatePage: Stopper key length is not correct!")
+	//		}
+	//		actKeys++
+	//	}
+	//}
+	//if actKeys != page.Act {
+	//	panic(fmt.Sprintf("ValidatePage: Act key count is not correct! %d != %d\n", actKeys, page.Act))
+	//}
+	////if garbage != page.Garbage {
+	////	panic(fmt.Sprintf("validatePage: Garbage value is not collect! %d != %d", garbage, page.Garbage))
+	////}
+	//if page.Min < page.Cnt*SlotSize {
+	//	panic("ValidatePage: Min is not correct!")
+	//}
+	return true
 }
