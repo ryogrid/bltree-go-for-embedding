@@ -17,7 +17,10 @@
 - You need allocate fixed amount of pages to BufMgr of bltree-go-for-embedding, unfortunately your buffer manager can't page out all of pages which are used by bltree-go-for-embedding
   - The amount can be specified at call of factory function of BufMgr
 - Page size can be specified in same manner with bits of page size
-  - ex: 12 bits means 2^12 bytes (4096 bytes) 
+  - ex: 12 bits means 2^12 bytes (4096 bytes)
+- Max size of key is 200bytes and sizes of all keys should be same
+  - Causes of this restriction are some bugs on concurrent access
+  - Without this restriction,  this lib rarely crashes though works collectly on almost of all situation
 
 # Usage example
 - In [ryogrid/SamehadaDB](https://github.com/ryogrid/SamehadaDB)
